@@ -212,11 +212,12 @@ function onSessionStarted(session) {
 }
 ```
 
-While many sites will be able to provide this fallback, for some sites this will not be possible.  Under these circumstances, it is instead preferable for session creation to reject rather than spin up immersive display/tracking systems only to immediately exit the session.
+While many sites will be able to provide this fallback, for some sites this will not be possible.  Under these circumstances, it is instead preferable for session creation to reject rather than spin up immersive display/tracking systems only to immediately exit the session. To make session creation contingent on support for a specific reference space types, pass the types as an array to the `XRSessionCreationOptions` dictionary's `requiredReferenceSpaceTypes` value. When given, the session request will only succeed if at least one of the specified types are supported.
 
 ```js
 function beginImmersiveSession() {
-  xrDevice.requestSession({ immersive: true,  requiredReferenceSpaceType:'unbounded' })
+  xrDevice.requestSession({ immersive: true, 
+                            requiredReferenceSpaceTypes:['unbounded', 'bounded'] })
       .then(onSessionStarted)
       .catch(err => {
         // Error will indicate required reference space type unavailable
@@ -316,7 +317,7 @@ This is a partial IDL and is considered additive to the core IDL found in the ma
 //
 
 partial dictionary XRSessionCreationOptions {
-  XRReferenceSpaceType requiredReferenceSpaceType;
+  sequence<XRReferenceSpaceTypes> requiredReferenceSpaceTypes;
 };
 
 partial interface XRSession {

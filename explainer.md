@@ -251,6 +251,67 @@ function drawScene(view) {
 }
 ```
 
+### Enabling device features
+
+The use of some XR device features may introduce user privacy concerns, and as a result must gain the users consent before they are exposed to the page. In order to make use of these features an XRSession must explicitly request them by passing the `desiredFeatures` session creation option into a `requestSession` call.
+
+The `desiredFeatures` session creation option takes an array of strings. The `requestSession` call will iterate through the array and map each string to an `XRSessionFeature` enum. Items from the array that do not have a matching entry in the `XRSessionFeature` enum are ignored. (This is to ensure that newly added features do not break older UAs that don't recognize them.) Similarly, if the feature is not supported by the UA or XR device it is ignored. If the UA requires user consent for any of the supported features in the array, it must request that consent prior to the `requestSession` call resolving. Though UAs may have differing opinions on which features require explicit user consent, developers should expect that any entries in the `desiredFeatures` array will trigger a consent request visible to the user.
+
+An `XRSession` should still be returned even if the user denies consent for the desired features, and the feature's availability should be detected in a feature-specific manner once the session has been created. No differentiation is made at runtime between features that have not been requested, features that are not supported, and features for which consent has been denied.
+
+This samples shows how a developer would request a theoretical feature (here called `feature-name`) that exposes new data on the `XRFrame` and test for it's availability once the session has been created:
+
+```js
+// TODO: Make the example feature not theoretical.
+navigator.xr.requestSession({
+    mode: 'immersive-vr',
+    desiredFeatures: ['feature-name']
+  }).then(onSessionStarted);
+
+function onDrawFrame(timestamp, xrFrame) {
+  if (xrFrame.featureName) {
+    // Handle data from the requested feature.
+  }
+
+  // Handle the rest of the frame as normal.
+}
+```
+
+In some cases use of a feature may be critical to the functionality of the application, and as such the developer may want to suppress session creation unless all required features are available. This can be accomplished with the `requiredFeatures` session creation option.
+
+The `requiredFeatures` option is similar to the `desiredFeatures` option, but has some crucial behavioral differences. It takes an array of `XRSessionFeature` enums, and if any entries are not recognized by the UA the `requestSession` call must reject. Additionally, if any feature listed in the `requiredFeatures` array is not supported or the user does not consent to exposing any of the features the `requestSession` call must reject. Specifying any `requiredFeatures` with an `inline` session must reject. Sessions rejected due to the `requiredFeatures` array must reject with a [`NotSupportedError`](https://heycam.github.io/webidl/#notsupportederror) with an message indicating that the required features could not be satisfied. The message must not indicate which features were not available or why.
+
+The availability of required features should be evaluated prior to performing any session initialization steps that would be visible to the users aside from requesting consent. (For example, a phone-based VR system should not request the user places the phone in a viewer if the required features cannot be satisfied.)
+
+This samples shows how a developer would request a session requiring the theoretical `feature-name` feature, and :
+
+```js
+// TODO: Make the example feature not theoretical.
+navigator.xr.requestSession({
+    mode: 'immersive-vr',
+    requiredFeatures: ['feature-name']
+  }).then(onSessionStarted)
+  .catch((reason) => {
+    console.log("Required features unavailable: " + reason);
+  });
+```
+
+UAs should ideally combine any consent requests resulting from both the `desiredFeatures` and `requiredFeatures` arrays into a single request so that the user isn't, for example, shown a long series of modal consent dialogs when a session is requests that makes use of many features.
+
+Finally, there are some occasions where developers may want to defer a feature request until a more contextually appropriate time. For example **(FIXME: Is there a better short-term example?)**, an `immersive-ar` application may not need access to the camera stream until the point that the user clicks a "take a photo" button, at which point a request for camera access will be less concerning for the user. For these types of situations, new features can be requested after session creation with the `requestAdditionalFeatures` method. `requestAdditionalFeatures` can only be called in response to a user activation event, and accepts an array of strings that are processed identically to the `desiredFeatures` session creation option. It returns a promise that resolves when the user has consented to or denied use of any supported features. Individual features must still be checked to see if they are available after the promise resolves.
+
+```js
+// TODO: Make the example feature not theoretical.
+funciton onClickPhotoButton() {
+  xrSession.requestAdditionalFeatures(['camera-stream']).then(() => {
+    let cameraStream = xrSession.getCameraStream();
+    if (cameraStream) {
+      // ...
+    }
+  });
+}
+```
+
 ### Handling suspended sessions
 
 The UA may temporarily "suspend" a session at any time. While suspended a session has restricted or throttled access to the XR device state and may process frames slowly or not at all. Suspended sessions can be reasonably be expected to be resumed at some point, usually when the user has finished performing whatever action triggered the suspension in the first place.
@@ -553,11 +614,18 @@ enum XRSessionMode {
   "inline",
   "immersive-vr",
   "immersive-ar"
-}
+};
+
+enum XRSessionFeature {
+  "feature-name" // TODO: Need a good exemplar feature here.
+};
 
 dictionary XRSessionCreationOptions {
   XRSessionMode mode = "inline";
   XRPresentationContext outputContext;
+
+  sequence<XRSessionFeature> requiredFeatures;
+  sequence<DOMString> desiredFeatures;
 };
 
 [SecureContext, Exposed=Window] interface XRSession : EventTarget {
@@ -576,6 +644,8 @@ dictionary XRSessionCreationOptions {
 
   long requestAnimationFrame(XRFrameRequestCallback callback);
   void cancelAnimationFrame(long handle);
+
+  Promise<void> requestAdditionalFeatures(sequence<DOMString> desiredFeatures);
 
   Promise<void> end();
 };
