@@ -178,37 +178,17 @@ function onSessionStarted(session) {
 ```
 
 ### Application-supplied transforms
-Frequently developers will want to provide an additional, artificial transform on top of the user's tracked motion to allow the user to navigate larger virtual scenes than their tracking systems or physical space allows. This effect is traditionally accomplished by mathematically combining the API-provided transform with the desired additional application transforms. WebXR offers developers a simplification to ensure that all tracked values are transformed consistently, allowing the user's viewpoint and inputs to stay in sync.
+Frequently developers will want to provide an additional, artificial transform on top of the user's tracked motion to allow the user to navigate larger virtual scenes than their tracking systems or physical space allows. This effect is traditionally accomplished by mathematically combining the API-provided transform with the desired additional application transforms. WebXR offers developers a simplification to ensure that all tracked values, such as viewer and input poses, are transformed consistently.
 
-Developers can specify application-specific transforms by setting the `originTransform` attribute of any `XRReferenceSpace`. When the `transform` is not null, any values queried using the `XRReferenceSpace` will be offset by the `position` and `orientation` the `originTransform` describes. The `XRReferenceSpace`'s `originTransform` can be updated at any time and will immediately take effect, meaning that any new values that are queried with the `XRReferenceSpace` will take into account the new `originTransform`. Previously queried values will not be altered. Changing the `originTransform` between pose queries in a single frame is not advised, since it will cause inconsistencies in the tracking data and rendered output.
+Developers can specify application-specific transforms by setting the `originOffset` attribute of any `XRReferenceSpace`. The `originOffset` is initialized to an identity transform, and any values queried using the `XRReferenceSpace` will be offset by the `position` and `orientation` the `originOffset` describes. The `XRReferenceSpace`'s `originOffset` can be updated at any time and will immediately take effect, meaning that any subsequent poses queried with the `XRReferenceSpace` will take into account the new `originOffset`. Previously queried values will not be altered. Changing the `originOffset` between pose queries in a single frame is not advised, since it will cause inconsistencies in the tracking data and rendered output.
 
-The following example demonstrates how to create a `floor-level` reference space to account for a scene where the user is intended to start at a location 2 meters to the right and 3 meters back from the scene's origin.
-
-```js
-let xrSession = null;
-let xrReferenceSpace = null;
-
-function onSessionStarted(session) {
-  xrSession = session;
-  xrSession.requestReferenceSpace({ type:'stationary', subtype:'floor-level' })
-  .then((referenceSpace) => {
-    xrReferenceSpace = referenceSpace;
-    xrReferenceSpace.originTransform = new XRRigidTransform({ x: 2, z: 3 });
-  })
-  .then(setupWebGLLayer)
-  .then(() => {
-    xrSession.requestAnimationFrame(onDrawFrame);
-  });
-}
-```
-
-Another common use case for this attribute would be for a "teleportation" mechanic, where the user "jumps" to a new point in the virtual scene, after which the selected point is treated as the new virtual origin which all tracked motion is relative to.
+A common use case for this attribute would be for a "teleportation" mechanic, where the user "jumps" to a new point in the virtual scene, after which the selected point is treated as the new virtual origin which all tracked motion is relative to.
 
 ```js
 // Teleport the user a certain number of meters along the X, Y, and Z axes
 function teleport(deltaX, deltaY, deltaZ) {
-  let currentOrigin = xrReferenceSpace.originTransform;
-  xrReferenceSpace.originTransform = new XRRigidTransform(
+  let currentOrigin = xrReferenceSpace.originOffset;
+  xrReferenceSpace.originOffset = new XRRigidTransform(
       { x: currentOrigin.position.x + deltaX,
         y: currentOrigin.position.y + deltaY,
         z: currentOrigin.position.z + deltaZ },
@@ -272,7 +252,7 @@ Additionally, XR hardware with orientation-only tracking may also provide an emu
 There are several circumstances in which developers may choose to relate content in different reference spaces.
 
 #### Inline to Immersive
-It is expected that developers will often choose to preview `immersive` experiences with a similar experience `inline`. In this situation, users often expect to see the scene from the same perspective when they make the transition from `inline` to `immersive`. To accomplish this, developers should grab the `transform` of the last `XRViewerPose` retrieved using the `inline` session's `XRReferenceSpace` and set it as the `originTransform` of the `immersive` session's `XRReferenceSpace`. The same logic applies in the reverse when exiting `immersive`.
+It is expected that developers will often choose to preview `immersive` experiences with a similar experience `inline`. In this situation, users often expect to see the scene from the same perspective when they make the transition from `inline` to `immersive`. To accomplish this, developers should grab the `transform` of the last `XRViewerPose` retrieved using the `inline` session's `XRReferenceSpace` and set it as the `originOffset` of the `immersive` session's `XRReferenceSpace`. The same logic applies in the reverse when exiting `immersive`.
 
 #### Unbounded to Bounded 
 When building an experience that is predominantly based on an `XRUnboundedReferenceSpace`, developers may occasionally choose to switch to an `XRBoundedReferenceSpace`.  For example, a whole-home renovation experience might choose to switch to a bounded reference space for reviewing a furniture selection library.  If necessary to continue displaying content belonging to the previous reference space, developers may use the `getTransformTo()` method to re-parent nearby virtual content to the new reference space.
@@ -404,7 +384,7 @@ dictionary XRReferenceSpaceOptions {
 };
 
 [SecureContext, Exposed=Window] interface XRReferenceSpace : XRSpace {  
-  attribute XRRigidTransform originTransform;
+  attribute XRRigidTransform originOffset;
 
   attribute EventHandler onreset;
 };
