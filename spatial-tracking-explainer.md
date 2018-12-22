@@ -403,9 +403,6 @@ partial interface XRFrame {
   // Also listed in the main explainer.md
   XRViewerPose? getViewerPose(XRReferenceSpace referenceSpace);
   XRPose? getPose(XRSpace space, XRSpace relativeTo);
-
-  // Also listed in input-explainer.md	
-  XRInputPose? getInputPose(XRInputSource inputSource, optional XRReferenceSpace referenceSpace);
 };
 
 [SecureContext, Exposed=Window]
@@ -422,7 +419,7 @@ interface XRPose {
 //
 
 [SecureContext, Exposed=Window] interface XRSpace : EventTarget {
-  // TODO: Anything meaningful we can put here?
+  // Intentionally an opaque type, used by XRInputSource.
 };
 
 //
