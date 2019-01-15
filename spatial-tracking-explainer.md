@@ -416,7 +416,7 @@ interface XRPose {
 //
 
 [SecureContext, Exposed=Window] interface XRSpace : EventTarget {
-  // Interface is intentionally opaque.
+  // Interface is intentionally opaque
 };
 
 //

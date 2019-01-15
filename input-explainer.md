@@ -33,7 +33,7 @@ If the input source has only 3DOF, the grip pose may represent only a translatio
 
 An input source will also provide its preferred pointing ray, given by the `XRInputSource`'s `targetRaySpace`. This can be used to get the `XRPose` for the input's target rays.
 
-An `XRRay` can be constructed from the `XRPose`'s `transform`. A rays includes both an `origin` and `direction`, both given as `DOMPointReadOnly`s. The `origin` represents a 3D coordinate in space with a `w` component that must be 1, and the `direction` represents a normalized 3D directional vector with a `w` component that must be 0. The `XRRay`'s `matrix` represents the transform from a ray originating at `[0, 0, 0]` and extending down the negative Z axis to the ray described by the `XRRay`'s `origin` and `direction`. This is useful for positioning graphical representations of the ray.
+An `XRRay` can be constructed from the `XRPose`'s `transform`. A ray includes both an `origin` and `direction`, both given as `DOMPointReadOnly`s. The `origin` represents a 3D coordinate in space with a `w` component that must be 1, and the `direction` represents a normalized 3D directional vector with a `w` component that must be 0. The `XRRay`'s `matrix` represents the transform from a ray originating at `[0, 0, 0]` and extending down the negative Z axis to the ray described by the `XRRay`'s `origin` and `direction`. This is useful for positioning graphical representations of the ray.
 
 The `targetRaySpace` will never be `null`. It's value will differ based on the type of input source that produces it, which is represented by the `targetRayMode` attribute:
 
