@@ -174,7 +174,7 @@ function onSessionStarted(session) {
 ### Identity reference spaces
 An _identity_ reference space is one which provides no tracking. This type of reference space is used for creating inline experiences with tracking information explicitly disabled. Instead, developers use `XRReferenceSpace.originOffset` which is described in the [Application supplied transforms section](#application-supplied-transforms).  An example usage of an _identity_ reference space is a furniture viewer that will use [click-and-drag controls](#click-and-drag-view-controls) to rotate the furniture. It also supports cases where the developer wishes to avoid displaying any type of tracking consent prompt to the user prior while displaying inline content.
 
-This type of reference space is requested with a type of `identity` and returns a basic `XRReferenceSpace`. Calls to `getPose()` with this reference space as either the `space` or `relativeTo` parameter will return null.  `XRViewerPose` objects retrieved with this reference space will have a `transform` that is equal to the reference space's `originOffset` and the `XRView` matrices will be offset accordingly.
+This type of reference space is requested with a type of `identity` and returns a basic `XRReferenceSpace`. `XRViewerPose` objects retrieved with this reference space will have a `transform` that is equal to the reference space's `originOffset` and the `XRView` matrices will be offset accordingly.
 
 ```js
 let xrSession = null;
