@@ -312,7 +312,7 @@ enum XREnvironmentBlendMode {
 
   // Methods
   void updateRenderState(optional XRRenderStateInit state);
-  Promise&lt;XRReferenceSpace&gt; requestReferenceSpace(XRReferenceSpaceOptions options);
+  Promise&lt;XRReferenceSpace&gt; requestReferenceSpace(sequence&lt;XRReferenceSpaceOptions&gt; optionsList);
 
   FrozenArray&lt;XRInputSource&gt; getInputSources();
 
@@ -404,11 +404,12 @@ When requested, the {{XRSession}} MUST <dfn>apply pending render states</dfn> by
 
 <div class="algorithm" data-algorithm="request-reference-space">
 
-When the <dfn method for="XRSession">requestReferenceSpace(|options|)</dfn> method is invoked, the user agent MUST return [=a new Promise=] |promise| and run the following steps [=in parallel=]:
+When the <dfn method for="XRSession">requestReferenceSpace(|optionsList|)</dfn> method is invoked, the user agent MUST return [=a new Promise=] |promise| and run the following steps [=in parallel=]:
 
-  1. [=Create a reference space=], |referenceSpace|, as described by |options|.
-  1. If |referenceSpace| is <code>null</code>, [=reject=] |promise| with a {{NotSupportedError}} and abort these steps.
-  1. [=/Resolve=] |promise| with |referenceSpace|.
+  1. For each {{XRReferenceSpaceOptions}} |options| in |optionsList|
+    1. [=Create a reference space=], |referenceSpace|, as described by |options|.
+    1. If |referenceSpace| is not <code>null</code>, [=/resolve=] |promise| with |referenceSpace| and abort these steps.
+  1. [=Reject=] |promise| with a {{NotSupportedError}}.
 
 </div>
 
@@ -742,10 +743,9 @@ The <dfn attribute for="XRReferenceSpace">onreset</dfn> attribute is an [=Event 
 
 <div class="algorithm" data-algorithm="create-frame-of-reference">
 
-When an {{XRReferenceSpace}} is requested, the user agent MUST <dfn>create a reference space</dfn> by running the following steps:
+When an {{XRReferenceSpace}} is requested with {{XRReferenceSpaceOptions}} |options|, the user agent MUST <dfn>create a reference space</dfn> by running the following steps:
 
   1. Initialize [=XRSpace/session=] be the {{XRSession}} object that requested creation of a reference space.
-  1. Let |options| be the {{XRReferenceSpaceOptions}} passed to {{requestReferenceSpace()}}.
   1. Let |type| be set to |options| {{XRReferenceSpaceOptions/type}}.
   1. Let |referenceSpace| be set to <code>null</code>.
   1. If |type| is {{stationary}} and |options| does not have a {{XRReferenceSpaceOptions/subtype}} field, throw {{TypeError}}.
