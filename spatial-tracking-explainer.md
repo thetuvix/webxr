@@ -202,10 +202,10 @@ One of the core features of any XR platform is its ability to track spatial rela
 #### Rigid Transforms
 When working with real-world spaces, it is important to be able to express transforms exclusively in terms of position and orientation. In WebXR this is done through the `XRRigidTransform` which contains a `position` vector and an `orientation` quaternion. When interpreting an `XRRigidTransform` the `orientation` is applied prior to the `position`. This means that, for example, a transform that indicates a quarter rotation to the right and a 1-meter translation along -Z would place a transformed object at `[0, 0, -1]` facing to the right. `XRRigidTransform`s also have a `matrix` attribute that reports the same transform as a 4×4 matrix when needed. By definition, the matrix of a rigid transform cannot contain scale or skew.
 
-#### Poses
+#### Poses and tracking loss
 On a frame-by-frame basis, developers can query the location of any `XRSpace` relative to another `XRSpace` via the `XRFrame.getPose()` function. This function takes the `space` parameter which is the `XRSpace` to locate and the `relativeTo` parameter which defines the coordinate system in which the resulting `XRPose` should be returned. The `transform` attribute of `XRPose` is an `XRRigidTransform` representing the location of `space` within `relativeTo`. 
 
-Developers should always check the result from `getPose()` as it will be null on frames in which `space`'s location cannot be determined within `relativeTo`. This may happen due to overall tracking loss, `space` or `relativeTo` not being locatable, or for other reasons. While the `relativeTo` parameter is an `XRSpace`, developers will often choose to supply a `XRReferenceSpace` as the `relativeTo` parameter so that coordinates will be consistent with those used for rendering. For more information on rendering, see the main [WebXR explainer](explainer.md). 
+While the `relativeTo` parameter is an `XRSpace`, developers will often choose to supply a `XRReferenceSpace` as the `relativeTo` parameter so that coordinates will be consistent with those used for rendering. For more information on rendering, see the main [WebXR explainer](explainer.md).
 
 ```js
   let pose = frame.getPose(xrSpace, xrReferenceSpace);
@@ -214,7 +214,19 @@ Developers should always check the result from `getPose()` as it will be null on
   }
 ```
 
-The `emulatedPosition` attribute of `XRPose` indicates that the translation components of retrieved pose matrices may not be accurate. There are a number of reasons this might be the case. For example, a headset with orientation-only tracking capability may include position data to represent neck modeling. Another reason might be the underlying platform's tracking-loss behavior causes orientation data to be updated while it is unable to update position data. In these situations, the `emulatedPosition` attribute will be set to `true`.
+Developers should check initially that the result from `getPose()` is not null, as the pose of `space` within `relativeTo` may not have been established yet. For example, a viewer may not yet have been tracked within the application's `XRReferenceSpace`, or a motion controller may not yet have been observed after the user turned it on.
+
+However, once a pose is initially established for a viewer or input source, pose matrices should continue to be provided even during tracking loss. The `emulatedPosition` attribute of `XRPose` indicates that the position component of the retrieved pose matrix does not represent an actively tracked position. There are a number of reasons this might be the case. For example:
+* A viewer with orientation-only tracking, whose position within an `XRStationaryReferenceSpace` represents neck modeling.
+* A viewer that has temporarily lost positional tracking, whose position within an `XRReferenceSpace` represents the viewer's last-known position in thst space, plus inertial dead reckoning and/or neck modeling to continue providing a position.
+* A motion controller with orientation-only tracking, which is positioned at an assumed position, e.g. by the user's hip.
+* A motion controller that has temporarily lost positional tracking but is still held, whose orientation continues to update at the last-known position relative to the viewer.
+
+This base tracking loss behavior enables developers to then build whatever tracking loss behavior their scenario requires.
+
+For viewer poses, it's common in VR experiences to let the world drag along with you during positional tracking loss, as this can be preferable to halting the experience. By continuing to render the experience with viewer poses even when `emulatedPosition` is true, this behavior can be obtained easily. In contrast, when building an AR experience where anchoring of rendered objects to the real world is more critical, developers can detect that the viewer pose's `emulatedPosition` has become false and stop rendering the main scene, falling back to an orientation-only warning.
+
+For input source poses, motion controllers may have their own inertial tracking that can continue updating orientation while positional tracking is lost. If using a controller primarily to target distant objects, developers may simply ignore `emulatedPosition` and continue to point using each frame's updated target ray as the user rotates the controller. If using a controller to do fine operations, such as painting at the controller's tip, developers may instead choose to stop painting when `emulatedPosition` becomes false, ensuring that only high-quality paint strokes are drawn.
 
 #### Rays
 An `XRRay` object includes both an `origin` and `direction`, both given as `DOMPointReadOnly`s. The `origin` represents a 3D coordinate in space with a `w` component that must be 1, and the `direction` represents a normalized 3D directional vector with a `w` component that must be 0. The `XRRay` also defines a `matrix` which represents the transform from a ray originating at `[0, 0, 0]` and extending down the negative Z axis to the ray described by the `XRRay`'s `origin` and `direction`. This is useful for positioning graphical representations of the ray.
