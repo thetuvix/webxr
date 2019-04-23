@@ -197,28 +197,33 @@ function onSessionStarted(session) {
 ## Spatial relationships
 One of the core features of any XR platform is its ability to track spatial relationships. Tracking the location of the viewer is perhaps the simplest example, but many other XR platform features, such as hit testing or anchors, are rooted in understanding the space the XR system is operating in. In WebXR any feature that tracks spatial relationships is built on top of the `XRSpace` interface. Each `XRSpace` represents something being tracked by the XR system, such as an `XRReferenceSpace`, and it is only possible to know their relative locations on a frame-by-frame basis.
 
-### Coordinates in 3D Space
+### Spatial coordinate types
+Coordinates accepted as input or provided as output from WebXR are always expressed relative to a specific `XRSpace` chosen by the developer. There are two key types used to express these spatial coordinates, `XRRigidTransform` and `XRRay`.
 
-#### Rigid Transforms
+#### Rigid transforms
 When working with real-world spaces, it is important to be able to express transforms exclusively in terms of position and orientation. In WebXR this is done through the `XRRigidTransform` which contains a `position` vector and an `orientation` quaternion. When interpreting an `XRRigidTransform` the `orientation` is applied prior to the `position`. This means that, for example, a transform that indicates a quarter rotation to the right and a 1-meter translation along -Z would place a transformed object at `[0, 0, -1]` facing to the right. `XRRigidTransform`s also have a `matrix` attribute that reports the same transform as a 4×4 matrix when needed. By definition, the matrix of a rigid transform cannot contain scale or skew.
 
-#### Poses and tracking loss
+#### Rays
+An `XRRay` object includes both an `origin` and `direction`, both given as `DOMPointReadOnly`s. The `origin` represents a 3D coordinate in space with a `w` component that must be 1, and the `direction` represents a normalized 3D directional vector with a `w` component that must be 0. The `XRRay` also defines a `matrix` which represents the transform from a ray originating at `[0, 0, 0]` and extending down the negative Z axis to the ray described by the `XRRay`'s `origin` and `direction`. This is useful for positioning graphical representations of the ray.
+
+### Poses
 On a frame-by-frame basis, developers can query the location of any `XRSpace` relative to another `XRSpace` via the `XRFrame.getPose()` function. This function takes the `space` parameter which is the `XRSpace` to locate and the `relativeTo` parameter which defines the coordinate system in which the resulting `XRPose` should be returned. The `transform` attribute of `XRPose` is an `XRRigidTransform` representing the location of `space` within `relativeTo`. 
 
 While the `relativeTo` parameter is an `XRSpace`, developers will often choose to supply a `XRReferenceSpace` as the `relativeTo` parameter so that coordinates will be consistent with those used for rendering. For more information on rendering, see the main [WebXR explainer](explainer.md).
 
 ```js
-  let pose = frame.getPose(xrSpace, xrReferenceSpace);
+  let pose = xrFrame.getPose(xrSpace, xrReferenceSpace);
   if (pose) {
     // Do a thing
   }
 ```
 
+#### Tracking loss
 Developers should check initially that the result from `getPose()` is not null, as the pose of `space` within `relativeTo` may not have been established yet. For example, a viewer may not yet have been tracked within the application's `XRReferenceSpace`, or a motion controller may not yet have been observed after the user turned it on.
 
 However, once a pose is initially established for a viewer or input source, pose matrices should continue to be provided even during tracking loss. The `emulatedPosition` attribute of `XRPose` indicates that the position component of the retrieved pose matrix does not represent an actively tracked position. There are a number of reasons this might be the case. For example:
 * A viewer with orientation-only tracking, whose position within an `XRStationaryReferenceSpace` represents neck modeling.
-* A viewer that has temporarily lost positional tracking, whose position within an `XRReferenceSpace` represents the viewer's last-known position in thst space, plus inertial dead reckoning and/or neck modeling to continue providing a position.
+* A viewer that has temporarily lost positional tracking, whose position within an `XRReferenceSpace` represents the viewer's last-known position in that space, plus inertial dead reckoning and/or neck modeling to continue providing a position.
 * A motion controller with orientation-only tracking, which is positioned at an assumed position, e.g. by the user's hip.
 * A motion controller that has temporarily lost positional tracking but is still held, whose orientation continues to update at the last-known position relative to the viewer.
 
@@ -228,18 +233,20 @@ For viewer poses, it's common in VR experiences to let the world drag along with
 
 For input source poses, motion controllers may have their own inertial tracking that can continue updating orientation while positional tracking is lost. If using a controller primarily to target distant objects, developers may simply ignore `emulatedPosition` and continue to point using each frame's updated target ray as the user rotates the controller. If using a controller to do fine operations, such as painting at the controller's tip, developers may instead choose to stop painting when `emulatedPosition` becomes false, ensuring that only high-quality paint strokes are drawn.
 
-#### Rays
-An `XRRay` object includes both an `origin` and `direction`, both given as `DOMPointReadOnly`s. The `origin` represents a 3D coordinate in space with a `w` component that must be 1, and the `direction` represents a normalized 3D directional vector with a `w` component that must be 0. The `XRRay` also defines a `matrix` which represents the transform from a ray originating at `[0, 0, 0]` and extending down the negative Z axis to the ray described by the `XRRay`'s `origin` and `direction`. This is useful for positioning graphical representations of the ray.
+#### Tracking recovery
+As discussed above, during tracking loss, the viewer's pose will remain at their last-known position relative to each reference space, while continuing to incorporate orientation updates and any slight adjustments due to neck modeling. When the viewer then recovers positional tracking, developers may observe an instantaneous jump of the viewer pose. If the application continues to render during this time, the world will appear to drag along as the viewer moves around.
 
-### Viewer space
-Calls to `XRFrame.getViewerPose()` return an `XRViewerPose` object which contains the pose of the viewer along with the views to be rendered. Sometimes it is useful to have access to the `XRSpace` represented by the viewer directly, such when the developer wants to use it to compare locations against other `XRSpace` objects.
+When the viewer then recovers positional tracking, the origin of each `XRStationaryReferenceSpace`, `XRBoundedReferenceSpace` and `XRUnboundedReferenceSpace` will continue to track the same physical location as it did before tracking was lost. Therefore, in the first frame where the viewer pose's `emulatedPosition` is false again, the developer will observe an abrupt jump in the viewer pose back to its tracked position.
 
-```js
-  let pose = xrFrame.getPose(preferredInputSource.gripSpace, xrSession.viewerSpace);
-  if (pose) {
-    // Calculate how far the motion controller is from the user's head
-  }
-```
+For stationary experiences and bounded experiences without a "teleportation" mechanic, this is generally the desired behavior. For example, a seated VR racing experience may align the driver seat's head position to the origin of its `XRStationaryReferenceSpace`, centering the user in the driver seat when they are centered in their physical chair. By snapping the viewer pose back into position after tracking recovery, the experience remains centered around the user's physical chair.
+
+However, if a bounded experience does provide a "teleportation" mechanic, where the user can move through the virtual world without moving physically, it may be needlessly jarring to jump the user's position back after tracking recovery, since the exact mapping of the bounded reference space to the real world quickly becomes arbitrary anyway. Instead, when a bounded experience recovers tracking, it can simply resume the experience from the user's current position in the virtual world by absorbing that sudden jump into its teleportation offset. To do so, the developer detects that tracking was recovered this frame by observing a viewer pose where the `emulatedPosition` value is once again false, and then creates a replacement `XRBoundedReferenceSpace` with its `originOffset` adjusted by the amount that the viewer's position jumped since the previous frame. `originOffset` is described in the [Application supplied transforms section](#application-supplied-transforms).
+
+One exception to a reference space origin continuing to track its previous physical location is when the viewer regains positional tracking in a new area where the reference space's original physical origin can no longer be located. This may occur for a few reasons:
+* For an `XRBoundedReferenceSpace`, the user may walk far enough to transition from the bounds of one user-defined playspace to another. In this case, the origin of the `XRBoundedReferenceSpace` will snap to the defined origin of the new playspace bounds.
+* For an `XRUnboundedReferenceSpace`, the user may walk through a dark hallway and regain tracking in a new room, with the system not knowing the spatial relationship between the two rooms. In this case, the origin of the `XRUnboundedReferenceSpace` will snap to the position in the new room that results in the viewer's pose continuing seamlessly at the same coordinates in that reference space.
+
+In both cases above, the `onreset` event will fire for each affected reference space, indicating that the physical location of its origin has experienced a sudden discontinuity. Note that the `onreset` event fires only when the origin of the reference space itself jumps in the physical world, not when the viewer pose jumps relative to a stable reference space.
 
 ### Application-supplied transforms
 Frequently developers will want to provide an additional, artificial transform on top of the user's tracked motion to allow the user to navigate larger virtual scenes than their tracking systems or physical space allows. This effect is traditionally accomplished by mathematically combining the API-provided transform with the desired additional application transforms. WebXR offers developers a simplification to ensure that all tracked values, such as viewer and input poses, are transformed consistently.
@@ -268,6 +275,16 @@ It is expected that developers will often choose to preview `immersive` experien
 
 #### Unbounded to Bounded 
 When building an experience that is predominantly based on an `XRUnboundedReferenceSpace`, developers may occasionally choose to switch to an `XRBoundedReferenceSpace`.  For example, a whole-home renovation experience might choose to switch to a bounded reference space for reviewing a furniture selection library.  If necessary to continue displaying content belonging to the previous reference space, developers may call the `XRFrame`'s `getPose()` method to re-parent nearby virtual content to the new reference space.
+
+#### Viewer space
+Calls to `XRFrame.getViewerPose()` return an `XRViewerPose` object which contains the pose of the viewer along with the views to be rendered. However, sometimes it is useful to have access to the `XRSpace` represented by the viewer directly, such when the developer wants to use it to compare locations against other `XRSpace` objects. The developer can access the viewer space through `XRSession.viewerSpace` and then use that in calls to `getPose()`.
+
+```js
+  let pose = xrFrame.getPose(preferredInputSource.gripSpace, xrSession.viewerSpace);
+  if (pose) {
+    // Calculate how far the motion controller is from the user's head
+  }
+```
 
 ### Click-and-drag view controls
 Frequently with inline sessions it's desirable to have the view rotate when the user interacts with the inline canvas. This is useful on devices without tracking capabilities to allow users to still view the full scene, but can also be desirable on devices with some tracking capabilities, such as a mobile phone or tablet, as a way to adjust the users view without requiring them to physically turn around.
@@ -349,7 +366,7 @@ Some XR hardware with inside-out tracking has users establish "known spaces" tha
 Additionally, XR hardware with orientation-only tracking may also provide an emulated value for the floor offset of an `XRStationaryReferenceSpace` with the `floor-level` subtype.  On these devices, it is recommended that the User Agent or underlying platform provide a setting for users to customize this value.
 
 ### Reset Event
-The `XRReferenceSpace` type has an event, `onreset`, that is fired when a discontinuity of the reference space's origin occurs.  This discontinuity may be caused for different reasons for each type, but the result is essentially the same, the perception of the user's location will have changed.  In response, pages may wish to reposition virtual elements in the scene or clear any additional transforms, such as teleportation transforms, that may no longer be needed.  The `onreset` event will fire prior to any poses being delivered with the new origin/direction, and all poses queried following the event must be relative to the reset origin/direction. 
+The `XRReferenceSpace` type has an event, `onreset`, that is fired when there is a discontinuity of the location of the reference space's origin in the physical world.  This discontinuity may be caused for different reasons for each type, but the result is essentially the same, the perception of the user's location will have changed.  In response, pages may wish to reposition virtual elements in the scene or clear any additional transforms, such as teleportation transforms, that may no longer be needed.  The `onreset` event will fire prior to any poses being delivered with the new origin/direction, and all poses queried following the event must be relative to the reset origin/direction. The `transform` value in the `onreset` event data indicates the size of the jump of the reference space origin in the physical world, if known.
 
 ```js
 xrReferenceSpace.addEventListener('reset', xrReferenceSpaceEvent => {
@@ -368,12 +385,12 @@ xrReferenceSpace.addEventListener('reset', xrReferenceSpaceEvent => {
 ```
 
 Example reasons `onreset` may fire:
-* Some XR systems have a mechanism for allowing the user to reset which direction is "forward" or re-center the scene's origin at their current location.
-* When a user steps outside the bounds of a "known" playspace and enters a different "known" playspace
-* An inside-out based tracking system is temporarily unable to locate the user (ex: due to poor lighting conditions) and is unable to relate the new map fragment to the previous map fragment when it recovers
-* When the user has travelled far enough from the origin of an `XRUnboundedReferenceSpace` that floating point error would become problematic
+* For an `XRStationaryReferenceSpace`, some XR systems have a mechanism for allowing the user to reset which direction is "forward" or re-center the scene's origin at their current location.
+* For an `XRBoundedReferenceSpace`, a user steps outside the bounds of a "known" playspace and enters a different "known" playspace
+* For an `XRUnboundedReferenceSpace`, an inside-out based tracking system is temporarily unable to locate the user (e.g. due to poor lighting conditions in a dark hallway) and then recovers tracking in a new map fragment that cannot be related to the previous map fragment
+* For an `XRUnboundedReferenceSpace`, when the user has travelled far enough from the origin of the reference space that floating point error would become problematic
 
-The `onreset` event will **NOT** fire as an `XRUnboundedReferenceSpace` makes small changes to its origin as part of maintaining space stability near the user; these are considered minor corrections rather than a discontinuity in the origin.
+The `onreset` event will **NOT** fire when a reference space regains tracking of its previous physical origin, even if the viewer's pose suddenly jumps back into position, as the origin itself did not experience a discontinuity. The `onreset` event will also **NOT** fire as an `XRUnboundedReferenceSpace` makes small changes to its origin as part of maintaining space stability near the user; these are considered minor corrections rather than a discontinuity in the origin.
 
 ## Appendix A : Miscellaneous
 
