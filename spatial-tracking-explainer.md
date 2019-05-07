@@ -248,6 +248,8 @@ One exception to a reference space origin continuing to track its previous physi
 
 In both cases above, the `onreset` event will fire for each affected reference space, indicating that the physical location of its origin has experienced a sudden discontinuity. Note that the `onreset` event fires only when the origin of the reference space itself jumps in the physical world, not when the viewer pose jumps relative to a stable reference space.
 
+When an input source recovers positional tracking, its pose will instantly jump back into position. If the device tracks the input source relative to the viewer (e.g. a motion controller tracked by headset cameras) and the viewer itself still does not have positional tracking, the input source pose will continue to have an `emulatedPosition` value of true in any space other than viewer space. Once the input source's position in the requested space is known again, `emulatedPosition` will become false.
+
 ### Application-supplied transforms
 Frequently developers will want to provide an additional, artificial transform on top of the user's tracked motion to allow the user to navigate larger virtual scenes than their tracking systems or physical space allows. This effect is traditionally accomplished by mathematically combining the API-provided transform with the desired additional application transforms. WebXR offers developers a simplification to ensure that all tracked values, such as viewer and input poses, are transformed consistently.
 
