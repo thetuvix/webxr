@@ -4,15 +4,17 @@ This document explains the technology and portion of the WebXR APIs used to trac
 ## Introduction
 A big differentiating aspect of XR, as opposed to standard 3D rendering, is that users control the view of the experience via their body motion.  To make this possible, XR hardware needs to be capable of tracking the user's motion in 3D space.  Within the XR ecosystem there is a wide range of hardware form factors and capabilities which have historically only been available to developers through device-specific SDKs and app platforms. To ship software in a specific app store, developers optimize their experiences for specific VR hardware (HTC Vive, GearVR, Mirage Solo, etc) or AR hardware (HoloLens, ARKit, ARCore, etc).  WebXR  development is fundamentally different in that regard; the Web gives developers broader reach, with the consequence that they no longer have predictability about the capability of the hardware their experiences will be running on.
 
-## Reference Spaces
+## Reference spaces
 The wide range of hardware form factors makes it impractical and unscalable to expect developers to reason directly about the tracking technology their experience will be running on.  Instead, the WebXR Device API is designed to have developers think upfront about the mobility needs of the experience they are building which is communicated to the User Agent by explicitly requesting an appropriate `XRReferenceSpace`.  The `XRReferenceSpace` object acts as a substrate for the XR experience being built by establishing guarantees about supported motion and providing a space in which developers can retrieve `XRViewerPose` and its view matrices.  The critical aspect to note is that the User Agent (or underlying platform) is responsible for providing consistently behaved lower-capability `XRReferenceSpace` objects even when running on a higher-capability tracking system. 
 
-There are several types of reference spaces: `inline`, `position-disabled`, `eye-level`, `floor-level`, `bounded`, and `unbounded`.  A `bounded` experience is one in which the user will move around their physical environment to fully interact, but will not need to travel beyond a fixed boundary defined by the XR hardware.  An `unbounded` experience is one in which a user is able to freely move around their physical environment and travel significant distances.  `position-disabled`, `eye-level`, and `floor-level` experiences are ones which do not require the user to move around in space, and include "seated" or "standing" experiences.  Examples of each of these types of experiences can be found in the detailed sections below.
+There are several types of reference spaces: `viewer`, `local`, `local-floor`, `bounded-floor`, and `unbounded`, each mapping to a type of XR experience an app may wish to build.  A _bounded_ experience (`bounded-floor`) is one in which the user will move around their physical environment to fully interact, but will not need to travel beyond a fixed boundary defined by the XR hardware.  An _unbounded_ experience (`unbounded`) is one in which a user is able to freely move around their physical environment and travel significant distances.  A _local_ experience is one which does not require the user to move around in space, and may be either a "seated" (`local`) or "standing" (`local-floor`) experience. Finally, the `viewer` reference space can be used for experiences that function without any tracking (such as those that use click-and-drag controls to look around) or in conjunction with another reference space to track head-locked objects. Examples of each of these types of experiences can be found in the detailed sections below.
 
 It is worth noting that not all experiences will work on all XR hardware and not all XR hardware will support all experiences (see [Appendix A: XRReferenceSpace Availability](#xrreferencespace-availability)).  For example, it is not possible to build a experience which requires the user to walk around on a device like a GearVR.  In the spirit of [progressive enhancement](https://developer.mozilla.org/en-US/docs/Glossary/Progressive_Enhancement), it is strongly recommended that developers select the least capable `XRReferenceSpace` that suffices for the experience they are building.  Requesting a more capable reference space will artificially restrict the set of XR devices their experience will otherwise be viewable from.
 
-### Bounded Reference Space
-A _bounded_ experience is one in which a user moves around their physical environment to fully interact, but will not need to travel beyond a pre-established boundary.  A _bounded_ experience is similar to a _unbounded_ experience in that both rely on XR hardware capable of tracking a users' locomotion.  However, _bounded_ experiences are explicitly focused on nearby content which allows them to target XR hardware that requires a pre-configured play area as well as XR hardware able to track location freely.
+### Bounded reference space
+A _bounded_ experience is one in which a user moves around their physical environment to fully interact, but will not need to travel beyond a pre-established boundary. A bounded experience is similar to an unbounded experience in that both rely on XR hardware capable of tracking a users' locomotion. However, bounded experiences are explicitly focused on nearby content which allows them to target XR hardware that requires a pre-configured play area as well as XR hardware able to track location freely.
+
+Bounded experiences use an `XRReferenceSpaceType` of `bounded-floor`.
 
 Some example use cases: 
 * VR painting/sculpting tool
@@ -20,7 +22,7 @@ Some example use cases:
 * Dance games
 * Previewing of 3D objects in the real world
 
-The origin of this type will be initialized at a position on the floor for which a boundary can be provided to the app, defining an empty region where it is safe for the user to move around. The y value will be 0 at floor level, while the exact x, z, and orientation values will be initialized based on the conventions of the underlying platform for room-scale experiences. Platforms where the user defines a fixed room-scale origin and boundary may initialize the remaining values to match the room-scale origin. Users with fixed-origin systems are familiar with this behavior, however developers may choose to be extra resilient to this situation by building UI to guide users back to the origin if they are too far away. Platforms that generally allow for unbounded movement may display UI to the user during the asynchronous request, asking them to define or confirm such a floor-level boundary near the user's current location.
+The origin of a `bounded-floor` reference space will be initialized at a position on the floor for which a boundary can be provided to the app, defining an empty region where it is safe for the user to move around. The y value will be 0 at floor level, while the exact x, z, and orientation values will be initialized based on the conventions of the underlying platform for room-scale experiences. Platforms where the user defines a fixed room-scale origin and boundary may initialize the remaining values to match the room-scale origin. Users with fixed-origin systems are familiar with this behavior, however developers may choose to be extra resilient to this situation by building UI to guide users back to the origin if they are too far away. Platforms that generally allow for unbounded movement may display UI to the user during the asynchronous request, asking them to define or confirm such a floor-level boundary near the user's current location.
 
 ```js
 let xrSession = null;
@@ -28,7 +30,7 @@ let xrReferenceSpace = null;
 
 function onSessionStarted(session) {
   xrSession = session;
-  xrSession.requestReferenceSpace('bounded')
+  xrSession.requestReferenceSpace('bounded-floor')
   .then((referenceSpace) => {
     xrReferenceSpace = referenceSpace;
   })
@@ -39,7 +41,7 @@ function onSessionStarted(session) {
 }
 ```
 
-The `bounded` reference space also reports geometry within which the application should try to ensure that all content the user needs to interact with can be reached. This polygonal boundary represents a loop of points at the edges of the safe space. The points are given in a clockwise order as viewed from above, looking towards the negative end of the Y axis. The shape it describes is not guaranteed to be convex. The values reported are relative to the reference space origin, and must have a `y` value of `0` and a `w` value of `1`.
+The `bounded-floor` reference space also reports geometry within which the application should try to ensure that all content the user needs to interact with can be reached. This polygonal boundary represents a loop of points at the edges of the safe space. The points are given in a clockwise order as viewed from above, looking towards the negative end of the Y axis. The shape it describes is not guaranteed to be convex. The values reported are relative to the reference space origin, and must have a `y` value of `0` and a `w` value of `1`.
 
 ```js
 // Demonstrated here using a fictional 3D library to simplify the example code.
@@ -65,8 +67,10 @@ function createBoundsMesh() {
 }
 ```
 
-### Unbounded Reference Space
+### Unbounded reference space
 A _unbounded_ experience is one in which the user is able to freely move around their physical environment. These experiences explicitly require that the user be unbounded in their ability to walk around, and the unbounded reference space will adjust its origin as needed to maintain optimal stability for the user, even if the user walks many meters from the origin. In doing so, the origin may drift from its original physical location. The origin will be initialized at a position near the user's head at the time of creation. The exact `x`, `y`, `z`, and orientation values will be initialized based on the conventions of the underlying platform for unbounded experiences.
+
+Unbounded experiences use an `XRReferenceSpaceType` of `unbounded`.
 
 Some example use cases: 
 * Campus tour
@@ -91,39 +95,13 @@ function onSessionStarted(session) {
 
 There is no mechanism for getting a floor-relative _unbounded_ reference space. This is because the user may move through a variety of elevations (via stairs, hills, etc), making identification of a single floor plane impossible.
 
-### Stationary experiences
-A _stationary_ experience is one which does not require the user to move around in space.  This includes several categories of experiences that developers are commonly building today, and multiple reference space types are available to address each class of experience.  "Standing" experiences can be created with a `floor-level` reference space.  "Seated" experiences can be created with an `eye-level` reference space.  Orientation-only experiences such as 360 photo/video viewers can be created with a `position-disabled` reference space.
+### Local reference spaces
+A _local_ experience is one which does not require the user to move around in space.  There are two kinds of local experiences, eye-level local experiences and floor-level local experiences.
 
-It is important to note that `XRViewerPose` objects retrieved using `floor-level` and `eye-level` reference spaces may include position information as well as rotation information.  For example, hardware which does not support 6DOF tracking (ex: GearVR) may still use neck-modeling to improve user comfort. Similarly, a user may lean side-to-side on a device with 6DOF tracking (ex: HTC Vive).  It is important for user comfort that developers do not attempt to remove position data from these matrices and instead use a `position-disabled` reference space.  The result is that `floor-level` and `eye-level` experiences should be resilient to position changes despite not being dependent on receiving them.  
+#### Eye-level local reference space
+_Eye-level_ local experiences, sometimes referred to as "seated" experiences, initialize their origin at a position near the viewer's position at the time of creation. The exact `x`, `y`, `z`, and orientation values will be initialized based on the conventions of the underlying platform for local experiences. Some platforms may initialize these values to the viewer's exact position/orientation at the time of creation. Other platforms that allow users to reset a common local origin shared across multiple apps may use that origin instead.
 
-#### Floor-level reference spaces
-
-The origin of this reference space will be initialized at a position on the floor where it is safe for the user to engage in "standing-scale" experiences, with a `y` value of `0` at floor level. The exact `x`, `z`, and orientation values will be initialized based on the conventions of the underlying platform for standing-scale experiences. Some platforms may initialize these values to the user's exact position/orientation at the time of creation. Other platforms may place this standing-scale origin at the user's chosen floor-level origin for bounded experiences. It is also worth noting that some XR hardware will be unable to determine the actual floor level and will instead use an emulated or estimated floor.
-
-Some example use cases: 
-* VR chat "room"
-* Fallback for Bounded experience that relies on teleportation instead
-
-```js
-let xrSession = null;
-let xrReferenceSpace = null;
-
-function onSessionStarted(session) {
-  xrSession = session;
-  xrSession.requestReferenceSpace('floor-level')
-  .then((referenceSpace) => {
-    xrReferenceSpace = referenceSpace;
-  })
-  .then(setupWebGLLayer)
-  .then(() => {
-    xrSession.requestAnimationFrame(onDrawFrame);
-  });
-}
-```
-
-#### Eye-level reference spaces
-
-Sometimes referred to as "seated", this reference space's origin will be initialized at a position near the user's head at the time of creation. The exact `x`, `y`, `z`, and orientation values will be initialized based on the conventions of the underlying platform for `eye-level` experiences. Some platforms may initialize these values to the user's exact position/orientation at the time of creation. Other platforms that allow users to reset a common eye-level origin shared across multiple apps may use that origin instead.
+Eye-level local experiences use an `XRReferenceSpaceType` of `local`.
 
 Some example use cases: 
 * Immersive 2D video viewer
@@ -136,7 +114,7 @@ let xrReferenceSpace = null;
 
 function onSessionStarted(session) {
   xrSession = session;
-  xrSession.requestReferenceSpace('eye-level')
+  xrSession.requestReferenceSpace('local')
   .then((referenceSpace) => {
     xrReferenceSpace = referenceSpace;
   })
@@ -147,12 +125,20 @@ function onSessionStarted(session) {
 }
 ```
 
-#### Position-disabled reference spaces
+Orientation-only experiences such as 360 photo/video viewers can also be created with an `local` reference space by either explicitly ignoring the pose's positional data or displaying the media "infinitely" far away from the viewer. If such position mitigation steps are not taken the user may perceive the geometry the media is displayed on, leading to discomfort.
 
-The origin of this reference space will be initialized at a position near the user's head at the time of creation.  `XRViewerPose` objects retrieved with this reference space will have varying orientation values but will always report `x`, `y`, `z` values to be `0`.
+It is important to note that `XRViewerPose` objects retrieved using a `local` reference space may include position information as well as rotation information.  For example, hardware which does not support 6DOF tracking (ex: GearVR) may still use neck-modeling to improve user comfort. Similarly, a user may lean side-to-side on a device with 6DOF tracking (ex: HTC Vive). The result is that local experiences must be resilient to position changes despite not being dependent on receiving them. Experiences are encouraged to fully support head movement in a typical seated range.
+
+For some hardware the poses may even include substantial position offsets, for example if the user stands up from their seated position and walks around. The experience can choose to react to this appropriately, for example by fading out the rendered view when intersecting geometry. Overriding the pose's reported head position, for example clamping to stay within an expected volume, can be very uncomfortable to users and should be avoided.
+
+#### Floor-level local reference space
+_Floor-level_ local experiences, which do not require the user to move around in space but wish to provide the user with a floor plane, initialize their origin at a position on the floor where it is safe for the user to engage in a "standing" experience, with a `y` value of `0` at floor level. The exact `x`, `z`, and orientation values will be initialized based on the conventions of the underlying platform for standing experiences. Some platforms may initialize these values to the viewer's exact position/orientation at the time of creation. Other platforms may place this floor-level standing origin at the viewer's chosen floor-level origin for bounded experiences. It is also worth noting that some XR hardware will be unable to determine the actual floor level and will instead use an emulated or estimated floor.
+
+Floor-level local experiences use an `XRReferenceSpaceType` of `local-floor`.
 
 Some example use cases: 
-* 360 photo/video viewer
+* VR chat "room"
+* Fallback for Bounded experience that relies on teleportation instead
 
 ```js
 let xrSession = null;
@@ -160,7 +146,7 @@ let xrReferenceSpace = null;
 
 function onSessionStarted(session) {
   xrSession = session;
-  xrSession.requestReferenceSpace('position-disabled')
+  xrSession.requestReferenceSpace('local-floor')
   .then((referenceSpace) => {
     xrReferenceSpace = referenceSpace;
   })
@@ -171,31 +157,42 @@ function onSessionStarted(session) {
 }
 ```
 
-### Identity reference spaces
-An _identity_ reference space is one which provides no tracking. This type of reference space is used for creating inline experiences with tracking information explicitly disabled. Instead, developers use `XRReferenceSpace.originOffset` which is described in the [Application supplied transforms section](#application-supplied-transforms).  An example usage of an _identity_ reference space is a furniture viewer that will use [click-and-drag controls](#click-and-drag-view-controls) to rotate the furniture. It also supports cases where the developer wishes to avoid displaying any type of tracking consent prompt to the user prior while displaying inline content.
+As with `local` reference spaces, `XRViewerPose` objects retrieved using `local-floor` reference spaces may include position information as well as rotation information and as such must be resilient to position changes despite not being dependent on receiving them. For example, if a teleport is intended to place the user's feet at a chosen virtual world location, the calculated offset must take into account that the user's current tracked position may be a couple of steps away from the floor-level origin.
 
-This type of reference space is requested with a type of `identity` and returns a basic `XRReferenceSpace`. `XRViewerPose` objects retrieved with this reference space will have a `transform` that is equal to the reference space's `originOffset` and the `XRView` matrices will be offset accordingly.
+### Viewer reference space
+A _viewer_ reference space's origin is always at the position and orientation of the viewer device. This type of reference space is primarily used for creating inline experiences with no tracking of the viewer relative to it's physical environment. Instead, developers may use `XRReferenceSpace.getOffsetReferenceSpace()` which is described in the [Application supplied transforms section](#application-supplied-transforms). An example usage of an _viewer_ reference space is a furniture viewer that will use [click-and-drag controls](#click-and-drag-view-controls) to rotate the furniture. It also supports cases where the developer wishes to avoid displaying any type of tracking consent prompt to the user prior while displaying inline content.
+
+This type of reference space is requested with a type of `viewer` and returns a basic `XRReferenceSpace`. `XRViewerPose` objects retrieved with this reference space will have an identity `transform` (plus an offset if the reference space was created by calling `getOffsetReferenceSpace()`). `XRView`s populated from a `viewer` reference space will still be offset from the `XRViewerPose`'s `transform` in the same manner as all other reference spaces.
 
 ```js
 let xrSession = null;
-let xrReferenceSpace = null;
+let xrViewerReferenceSpace = null;
 
-// Create an 'identity' reference space
+// Create a 'viewer' reference space
 function onSessionStarted(session) {
   xrSession = session;
-  xrSession.requestReferenceSpace('identity')
+  xrSession.requestReferenceSpace('viewer')
   .then((referenceSpace) => {
-    xrReferenceSpace = referenceSpace;
+    xrViewerReferenceSpace = referenceSpace;
   })
   .then(setupWebGLLayer)
   .then(() => {
     xrSession.requestAnimationFrame(onDrawFrame);
   });
 }
+```
+
+The `viewer` reference space is also useful when the developer wants to compare the viewer's location against other `XRSpace` objects.
+
+```js
+  let pose = xrFrame.getPose(preferredInputSource.gripSpace, xrViewerReferenceSpace);
+  if (pose) {
+    // Calculate how far the motion controller is from the user's head
+  }
 ```
 
 ## Spatial relationships
-One of the core features of any XR platform is its ability to track spatial relationships. Tracking the location of the viewer is perhaps the simplest example, but many other XR platform features, such as hit testing or anchors, are rooted in understanding the space the XR system is operating in. In WebXR any feature that tracks spatial relationships is built on top of the `XRSpace` interface. Each `XRSpace` represents something being tracked by the XR system, such as an `XRReferenceSpace`, and it is only possible to know their relative locations on a frame-by-frame basis.
+One of the core features of any XR platform is its ability to track spatial relationships. Tracking the position and orientation, referred to together as a "pose", of the viewer is perhaps the simplest example, but many other XR platform features, such as hit testing or anchors, are rooted in understanding the space the XR system is operating in. In WebXR any feature that tracks spatial relationships is built on top of the `XRSpace` interface. Each `XRSpace` represents something being tracked by the XR system, such as an `XRReferenceSpace`, and each has a "native origin" that represents it's position and orientation in the XR tracking system. It is only possible to know the location of one `XRSpace` relative to another `XRSpace` on a frame-by-frame basis.
 
 ### Spatial coordinate types
 Coordinates accepted as input or provided as output from WebXR are always expressed within a specific `XRSpace` chosen by the developer. There are two key types used to express these spatial coordinates, `XRRigidTransform` and `XRRay`.
@@ -207,9 +204,9 @@ When working with real-world spaces, it is important to be able to express trans
 An `XRRay` object includes both an `origin` and `direction`, both given as `DOMPointReadOnly`s. The `origin` represents a 3D coordinate in space with a `w` component that must be 1, and the `direction` represents a normalized 3D directional vector with a `w` component that must be 0. The `XRRay` also defines a `matrix` which represents the transform from a ray originating at `[0, 0, 0]` and extending down the negative Z axis to the ray described by the `XRRay`'s `origin` and `direction`. This is useful for positioning graphical representations of the ray.
 
 ### Poses
-On a frame-by-frame basis, developers can query the location of any `XRSpace` within another `XRSpace` via the `XRFrame.getPose()` function. This function takes the `space` parameter which is the `XRSpace` to locate and the `relativeTo` parameter which defines the coordinate system in which the resulting `XRPose` should be returned. The `transform` attribute of `XRPose` is an `XRRigidTransform` representing the location of `space` within `relativeTo`. 
+On a frame-by-frame basis, developers can query the location of any `XRSpace` within another `XRSpace` via the `XRFrame.getPose()` function. This function takes the `space` parameter which is the `XRSpace` to locate and the `baseSpace` parameter which defines the coordinate system in which the resulting `XRPose` should be returned. The `transform` attribute of `XRPose` is an `XRRigidTransform` representing the location of `space` within `baseSpace`. 
 
-While the `relativeTo` parameter is an `XRSpace`, developers will often choose to supply a `XRReferenceSpace` as the `relativeTo` parameter so that coordinates will be consistent with those used for rendering. For more information on rendering, see the main [WebXR explainer](explainer.md).
+While the `baseSpace` parameter may be any `XRSpace`, developers will often choose to supply their primary `XRReferenceSpace` as the `baseSpace` parameter so that coordinates will be consistent with those used for rendering. For more information on rendering, see the main [WebXR explainer](explainer.md).
 
 ```js
   let pose = xrFrame.getPose(xrSpace, xrReferenceSpace);
@@ -219,10 +216,10 @@ While the `relativeTo` parameter is an `XRSpace`, developers will often choose t
 ```
 
 #### Tracking loss
-Developers should check initially that the result from `getPose()` is not null, as the pose of `space` within `relativeTo` may not have been established yet. For example, a viewer may not yet have been tracked within the application's `XRReferenceSpace`, or a motion controller may not yet have been observed after the user turned it on.
+Developers should check initially that the result from `getPose()` is not null, as the pose of `space` within `baseSpace` may not have been established yet. For example, a viewer may not yet have been tracked within the application's `XRReferenceSpace`, or a motion controller may not yet have been observed after the user turned it on.
 
 However, once a pose is initially established for a viewer or input source, pose matrices should continue to be provided even during tracking loss. The `emulatedPosition` attribute of `XRPose` indicates that the position component of the retrieved pose matrix does not represent an actively tracked position. There are a number of reasons this might be the case. For example:
-* A viewer with orientation-only tracking, whose position within an `eye-level` reference space represents neck modeling.
+* A viewer with orientation-only tracking, whose position within a `local` reference space represents neck modeling.
 * A viewer that has temporarily lost positional tracking, whose position within a reference space represents the viewer's last-known position in that space, plus inertial dead reckoning and/or neck modeling to continue providing a position.
 * A motion controller with orientation-only tracking, which is positioned at an assumed position, e.g. by the user's hip.
 * A motion controller that has temporarily lost positional tracking but is still held, whose orientation continues to update at the last-known position relative to the viewer.
@@ -236,14 +233,14 @@ For input source poses, motion controllers may have their own inertial tracking 
 #### Tracking recovery
 As discussed above, during tracking loss, the viewer's pose will remain at their last-known position within each reference space, while continuing to incorporate orientation updates and any slight adjustments due to neck modeling. When the viewer then recovers positional tracking, developers may observe an instantaneous jump of the viewer pose. If the application continues to render during this time, the world will appear to drag along as the viewer moves around.
 
-When the viewer then recovers positional tracking, the origin of each `eye-level`, `floor-level`, `bounded` and `unbounded` reference space will continue to track the same physical location as it did before tracking was lost. Therefore, in the first frame where the viewer pose's `emulatedPosition` is false again, the developer will observe an abrupt jump in the viewer pose back to its tracked position.
+When the viewer then recovers positional tracking, the origin of each `local`, `local-floor`, `bounded-floor` and `unbounded` reference space will continue to track the same physical location as it did before tracking was lost. Therefore, in the first frame where the viewer pose's `emulatedPosition` is false again, the developer will observe an abrupt jump in the viewer pose back to its tracked position.
 
-For stationary experiences and bounded experiences without a "teleportation" mechanic, this is generally the desired behavior. For example, a seated VR racing experience may align the driver seat's head position to the origin of its `eye-level` reference space, centering the user in the driver seat when they are centered in their physical chair. By snapping the viewer pose back into position after tracking recovery, the experience remains centered around the user's physical chair.
+For stationary experiences and bounded experiences without a "teleportation" mechanic, this is generally the desired behavior. For example, a seated VR racing experience may align the driver seat's head position to the eye-level origin of its `local` reference space, centering the user in the driver seat when they are centered in their physical chair. By snapping the viewer pose back into position after tracking recovery, the experience remains centered around the user's physical chair.
 
-However, if a bounded experience does provide a "teleportation" mechanic, where the user can move through the virtual world without moving physically, it may be needlessly jarring to jump the user's position back after tracking recovery, since the exact mapping of the bounded reference space to the real world quickly becomes arbitrary anyway. Instead, when a bounded experience recovers tracking, it can simply resume the experience from the user's current position in the virtual world by absorbing that sudden jump into its teleportation offset. To do so, the developer detects that tracking was recovered this frame by observing a viewer pose where the `emulatedPosition` value is once again false, and then creates a replacement `bounded` reference space with its `originOffset` adjusted by the amount that the viewer's position jumped since the previous frame. `originOffset` is described in the [Application supplied transforms section](#application-supplied-transforms).
+However, if a bounded experience does provide a "teleportation" mechanic, where the user can move through the virtual world without moving physically, it may be needlessly jarring to jump the user's position back after tracking recovery, since the exact mapping of the bounded reference space to the real world quickly becomes arbitrary anyway. Instead, when a bounded experience recovers tracking, it can simply resume the experience from the user's current position in the virtual world by absorbing that sudden jump into its teleportation offset. To do so, the developer detects that tracking was recovered this frame by observing a viewer pose where the `emulatedPosition` value is once again false, and then creates a replacement `bounded-floor` reference space with its `originOffset` adjusted by the amount that the viewer's position jumped since the previous frame. `originOffset` is described in the [Application supplied transforms section](#application-supplied-transforms).
 
 One exception to a reference space origin continuing to track its previous physical location is when the viewer regains positional tracking in a new area where the reference space's original physical origin can no longer be located. This may occur for a few reasons:
-* For a `bounded` reference space, the user may walk far enough to transition from the bounds of one user-defined playspace to another. In this case, the origin of the `bounded` reference space will snap to the defined origin of the new playspace bounds.
+* For a `bounded-floor` reference space, the user may walk far enough to transition from the bounds of one user-defined playspace to another. In this case, the origin of the `bounded-floor` reference space will snap to the defined origin of the new playspace bounds.
 * For an `unbounded` reference space, the user may walk through a dark hallway and regain tracking in a new room, with the system not knowing the spatial relationship between the two rooms. In this case, the origin of the `unbounded` reference space will snap to the position in the new room that results in the viewer's pose continuing seamlessly at the same coordinates in that reference space.
 
 In both cases above, the `onreset` event will fire for each affected reference space, indicating that the physical location of its origin has experienced a sudden discontinuity. Note that the `onreset` event fires only when the origin of the reference space itself jumps in the physical world, not when the viewer pose jumps within a stable reference space.
@@ -253,19 +250,20 @@ When an input source recovers positional tracking, its pose will instantly jump 
 ### Application-supplied transforms
 Frequently developers will want to provide an additional, artificial transform on top of the user's tracked motion to allow the user to navigate larger virtual scenes than their tracking systems or physical space allows. This effect is traditionally accomplished by mathematically combining the API-provided transform with the desired additional application transforms. WebXR offers developers a simplification to ensure that all tracked values, such as viewer and input poses, are transformed consistently.
 
-Developers can specify application-specific transforms by setting the `originOffset` attribute of any `XRReferenceSpace`. The `originOffset` is initialized to an identity transform, and any values queried using the `XRReferenceSpace` will be offset by the `position` and `orientation` the `originOffset` describes. The `XRReferenceSpace`'s `originOffset` can be updated at any time and will immediately take effect, meaning that any subsequent poses queried with the `XRReferenceSpace` will take into account the new `originOffset`. Previously queried values will not be altered. Changing the `originOffset` between pose queries in a single frame is not advised, since it will cause inconsistencies in the tracking data and rendered output.
+Developers can specify application-specific transforms by calling the getOffsetReferenceSpace() method of any XRReferenceSpace. This returns a new XRReferenceSpace where the XRRigidTransform passed to getOffsetReferenceSpace() describes the position and orientation of the offset space's origin in relation to the base reference space's origin. Specifically, the originOffset contains the pose of the new origin relative to the base reference space's origin. If the base reference space was also created with getOffsetReferenceSpace(), the overall offset is the combination of both transforms.
 
 A common use case for this attribute would be for a "teleportation" mechanic, where the user "jumps" to a new point in the virtual scene, after which the selected point is treated as the new virtual origin which all tracked motion is relative to.
 
 ```js
-// Teleport the user a certain number of meters along the X, Y, and Z axes
-function teleport(deltaX, deltaY, deltaZ) {
-  let currentOrigin = xrReferenceSpace.originOffset;
-  xrReferenceSpace.originOffset = new XRRigidTransform(
-      { x: currentOrigin.position.x + deltaX,
-        y: currentOrigin.position.y + deltaY,
-        z: currentOrigin.position.z + deltaZ },
-      currentOrigin.orientation);
+// Teleport the user a certain number of meters along the X, Y, and Z axes,
+// for example deltaX=1 means the virtual world view changes as if the user had
+// taken a 1m step to the right, so the new reference space pose should
+// have its X value increased by 1m.
+function teleportRelative(deltaX, deltaY, deltaZ) {
+  // Move the user by moving the reference space in the opposite direction,
+  // adjusting originOffset's position by the inverse delta.
+  xrReferenceSpace = xrReferenceSpace.getOffsetReferenceSpace(
+      new XRRigidTransform({ x: -deltaX, y: -deltaY, z: -deltaZ });
 }
 ```
 
@@ -273,10 +271,10 @@ function teleport(deltaX, deltaY, deltaZ) {
 There are several circumstances in which developers may choose to relate content in different reference spaces.
 
 #### Inline to Immersive
-It is expected that developers will often choose to preview `immersive` experiences with a similar experience `inline`. In this situation, users often expect to see the scene from the same perspective when they make the transition from `inline` to `immersive`. To accomplish this, developers should grab the `transform` of the last `XRViewerPose` retrieved using the `inline` session's `XRReferenceSpace` and set it as the `originOffset` of the `immersive` session's `XRReferenceSpace`. The same logic applies in the reverse when exiting `immersive`.
+It is expected that developers will often choose to preview `immersive` experiences with a similar experience `inline`. In this situation, users often expect to see the scene from the same perspective when they make the transition from `inline` to `immersive`. To accomplish this, developers should grab the `transform` of the last `XRViewerPose` retrieved using the `inline` session's `XRReferenceSpace` and pass it to `getOffsetReferenceSpace()` on the `immersive` session's `XRReferenceSpace` to produce an appropriately offset reference space. The same logic applies in the reverse when exiting `immersive`.
 
 #### Unbounded to Bounded 
-When building an experience that is predominantly based on an `unbounded` reference space, developers may occasionally choose to switch to a `bounded` reference space. For example, a whole-home renovation experience might choose to switch to a bounded reference space for reviewing a furniture selection library.  If necessary to continue displaying content belonging to the previous reference space, developers may call the `XRFrame`'s `getPose()` method to re-parent nearby virtual content to the new reference space.
+When building an experience that is predominantly based on an `unbounded` reference space, developers may occasionally choose to switch to a `bounded-floor` reference space. For example, a whole-home renovation experience might choose to switch to a `bounded-floor` reference space for reviewing a furniture selection library.  If necessary to continue displaying content belonging to the previous reference space, developers may call the `XRFrame`'s `getPose()` method to re-parent nearby virtual content to the new reference space.
 
 #### Viewer space
 Calls to `XRFrame.getViewerPose()` return an `XRViewerPose` object which contains the pose of the viewer along with the views to be rendered. However, sometimes it is useful to have access to the `XRSpace` represented by the viewer directly, such when the developer wants to use it to compare locations against other `XRSpace` objects. The developer can access the viewer space through `XRSession.viewerSpace` and then use that in calls to `getPose()`.
@@ -291,7 +289,7 @@ Calls to `XRFrame.getViewerPose()` return an `XRViewerPose` object which contain
 ### Click-and-drag view controls
 Frequently with inline sessions it's desirable to have the view rotate when the user interacts with the inline canvas. This is useful on devices without tracking capabilities to allow users to still view the full scene, but can also be desirable on devices with some tracking capabilities, such as a mobile phone or tablet, as a way to adjust the users view without requiring them to physically turn around.
 
-By updating the `originOffset` in response to pointer events, pages can provide basic click-and-drag style controls to allow the user to pan the view around the immersive scene.
+By calling `getOffsetReferenceSpace()` in response to pointer events, pages can provide basic click-and-drag style controls to allow the user to pan the view around the immersive scene.
 
 ```js
 // Amount to rotate, in radians, per CSS pixel of pointer movement.
@@ -299,31 +297,24 @@ const RAD_PER_PIXEL = Math.PI / 180.0; // (1 degree)
 
 // Pan the view any time pointer move events happen over the canvas.
 function onPointerMove(event) {
-  let s = Math.sin(event.movementX * RAD_PER_PIXEL);
-  let c = Math.cos(event.movementX * RAD_PER_PIXEL);
-  let o = xrReferenceSpace.originOffset.orientation;
-
-  xrReferenceSpace.originOffset = new XRRigidTransform(
-      // Keep the previous position
-      xrReferenceSpace.originOffset.position,
-      // Quaternion math to rotate the previous orientation around the Y axis.
-      {
-        x: o.x * c - o.z * s,
-        y: o.y * c + o.w * s,
-        z: o.z * c + o.x * s,
-        w: o.w * c - o.y * s
-      });
+  // Computes a quaternion to rotate around the Y axis.
+  let s = Math.sin(event.movementX * RAD_PER_PIXEL * 0.5);
+  let c = Math.cos(event.movementX * RAD_PER_PIXEL * 0.5);
+  xrReferenceSpace = xrReferenceSpace.getOffsetReferenceSpace(
+    new XRRigidTransform(null, { x: 0, y: s, z: 0, w: c }));
 }
 inlineCanvas.addEventListener('pointermove', onPointerMove);
 ```
 
+It should be noted that by repeatedly applying new offsets to previously offset reference spaces, numerical errors may accumulate over time. Whether that is problematic or not depends on the application, but when precision is necessary a better pattern would be to always call `getOffsetReferenceSpace()` on the original base space with the full offset computed by the application.
+
 ## Practical-usage guidelines
 
 ### Inline sessions
-Inline sessions, by definition, do not require a user gesture or user permission to create, and as a result there must be strong limitations on the pose data that can be reported for privacy and security reasons. Requests for `identity` reference spaces will always succeed. Requests for a `bounded` or an `unbounded` reference space will always be rejected on inline sessions. Requests for an `eye-level`, `floor-level`, or `position-disabled` reference space may succeed but may also be rejected if the UA is unable provide any tracking information such as for an inline session on a desktop PC or a 2D browser window in a headset. The UA is also allowed to request the user's consent prior to returning an `eye-level`, `floor-level`, or `position-disabled` reference space.
+Inline sessions, by definition, do not require a user gesture or user permission to create, and as a result there must be strong limitations on the pose data that can be reported for privacy and security reasons. Requests for `viewer` reference spaces will always succeed. Requests for a `bounded-floor` or an `unbounded` reference space will always be rejected on inline sessions. Requests for an `local` or `local-floor` reference space may succeed but may also be rejected if the UA is unable provide any tracking information such as for an inline session on a desktop PC or a 2D browser window in a headset. The UA is also allowed to request the user's consent prior to returning an `local` or `local-floor` reference space.
 
 ### Ensuring hardware compatibility
-Immersive sessions will always be able to provide `eye-level`, `floor-level`, and `position-disabled` reference spaces, but may not support other `XRReferenceSpace` types due to hardware limitations.  Developers are strongly encouraged to follow the spirit of [progressive enhancement](https://developer.mozilla.org/en-US/docs/Glossary/Progressive_Enhancement) and provide a reasonable fallback behavior if their desired `bounded` or `unbounded` reference space is unavailable.  In many cases it will be adequate for this fallback to behave similarly to an inline preview experience.
+Immersive sessions will always be able to provide `viewer`, `local`, and `local-floor` reference spaces, but may not support other `XRReferenceSpace` types due to hardware limitations.  Developers are strongly encouraged to follow the spirit of [progressive enhancement](https://developer.mozilla.org/en-US/docs/Glossary/Progressive_Enhancement) and provide a reasonable fallback behavior if their desired `bounded-floor` or `unbounded` reference space is unavailable.  In many cases it will be adequate for this fallback to behave similarly to an inline preview experience.
 
 ```js
 let xrSession = null;
@@ -331,13 +322,13 @@ let xrReferenceSpace = null;
 
 function onSessionStarted(session) {
   xrSession = session;
-  // First request an unbounded frame of reference.
-  xrSession.requestReferenceSpace('unbounded').then((referenceSpace) => {
+  // First request an bounded-floor frame of reference.
+  xrSession.requestReferenceSpace('bounded-floor').then((referenceSpace) => {
     xrReferenceSpace = referenceSpace;
   }).catch(() => {
-    // If an unbounded reference space is not available, request an eye-level
-    // frame of reference as a fallback and adjust the experience as necessary.
-    return xrSession.requestReferenceSpace('eye-level').then((referenceSpace) => {
+    // If a bounded-floor reference space isn't available, request a local-floor 
+    // reference space as a fallback and adjust the experience as necessary.
+    return xrSession.requestReferenceSpace('local-floor').then((referenceSpace) => {
       xrReferenceSpace = referenceSpace;
     });
   })
@@ -349,9 +340,9 @@ function onSessionStarted(session) {
 ```
 
 ### Floor Alignment
-Some XR hardware with inside-out tracking has users establish "known spaces" that can be used to easily provide `bounded` and `floor-level` reference spaces.  On inside-out XR hardware which does not intrinsically provide these known spaces, the User Agent must still provide `floor-level` reference spaces. It may do so by estimating a floor level, but may not present any UI at the time the reference space is requested.  
+Some XR hardware with inside-out tracking has users establish "known spaces" that can be used to easily provide `bounded-floor` and `local-floor` reference spaces.  On inside-out XR hardware which does not intrinsically provide these known spaces, the User Agent must still provide `local-floor` reference spaces. It may do so by estimating a floor level, but may not present any UI at the time the reference space is requested.  
 
-Additionally, XR hardware with orientation-only tracking may also provide an emulated value for the floor offset of a `floor-level` reference space. On these devices, it is recommended that the User Agent or underlying platform provide a setting for users to customize this value.
+Additionally, XR hardware with orientation-only tracking may also provide an emulated value for the floor offset of a `local-floor` reference space. On these devices, it is recommended that the User Agent or underlying platform provide a setting for users to customize this value.
 
 ### Reset Event
 The `XRReferenceSpace` type has an event, `onreset`, that is fired when there is a discontinuity of the location of the reference space's origin in the physical world.  This discontinuity may be caused for different reasons for each type, but the result is essentially the same, the perception of the user's location will have changed.  In response, pages may wish to reposition virtual elements in the scene or clear any additional transforms, such as teleportation transforms, that may no longer be needed.  The `onreset` event will fire prior to any poses being delivered with the new origin/direction, and all poses queried following the event must be relative to the reset origin/direction. The `transform` value in the `onreset` event data indicates the size of the jump of the reference space origin in the physical world, if known.
@@ -373,9 +364,9 @@ xrReferenceSpace.addEventListener('reset', xrReferenceSpaceEvent => {
 ```
 
 Example reasons `onreset` may fire:
-* For an `eye-level` or `floor-level` reference space, some XR systems have a mechanism for allowing the user to reset which direction is "forward" or re-center the scene's origin at their current location.
-* For a `bounded` reference space, a user steps outside the bounds of a "known" playspace and enters a different "known" playspace
-* For a `bounded` reference space, an inside-out based tracking system is temporarily unable to locate the user (e.g. due to poor lighting conditions in a dark hallway) and then recovers tracking in a new map fragment that cannot be related to the previous map fragment
+* For a `local` or `local-floor` reference space, some XR systems have a mechanism for allowing the user to reset which direction is "forward" or re-center the scene's origin at their current location.
+* For a `bounded-floor` reference space, a user steps outside the bounds of a "known" playspace and enters a different "known" playspace
+* For a `bounded-floor` reference space, an inside-out based tracking system is temporarily unable to locate the user (e.g. due to poor lighting conditions in a dark hallway) and then recovers tracking in a new map fragment that cannot be related to the previous map fragment
 * For an `unbounded` reference space, when the user has travelled far enough from the origin of the reference space that floating point error would become problematic
 
 The `onreset` event will **NOT** fire when a reference space regains tracking of its previous physical origin, even if the viewer's pose suddenly jumps back into position, as the origin itself did not experience a discontinuity. The `onreset` event will also **NOT** fire as an `unbounded` reference space makes small changes to its origin as part of maintaining space stability near the user; these are considered minor corrections rather than a discontinuity in the origin.
@@ -400,11 +391,10 @@ How to pick a reference space:
 
 | Type                | Examples                                      |
 | ------------        | --------------------------------------------- |
-| `identity`          | - In-page content preview<br>- Click/Drag viewing |
-| `position-disabled` | - 360 photo/video viewer |
-| `eye-level`         | - Immersive 2D video viewer<br>- Racing simulator<br>- Solar system explorer |
-| `floor-level`       | - VR chat "room"<br>- Action game where you duck and dodge in place<br>- Fallback for Bounded experience that relies on teleportation instead |
-| `bounded`           | - VR painting/sculpting tool<br>- Training simulators<br>- Dance games<br>- Previewing of 3D objects in the real world |
+| `viewer`            | - In-page content preview<br>- Click/Drag viewing |
+| `local`             | - Immersive 2D video viewer<br>- Racing simulator<br>- Solar system explorer |
+| `local-floor`       | - VR chat "room"<br>- Action game where you duck and dodge in place<br>- Fallback for Bounded experience that relies on teleportation instead |
+| `bounded-floor`     | - VR painting/sculpting tool<br>- Training simulators<br>- Dance games<br>- Previewing of 3D objects in the real world |
 | `unbounded`         | - Campus tour<br>- Renovation preview |
 
 ### XRReferenceSpace Availability
@@ -417,11 +407,10 @@ How to pick a reference space:
 
 | Type                | Inline             | Immersive  |
 | ------------        | ------------------ | ---------- |
-| `identity`          | Guaranteed         | Guaranteed |
-| `position-disabled` | Hardware-dependent | Guaranteed |
-| `eye-level`         | Hardware-dependent | Guaranteed |
-| `floor-level`       | Hardware-dependent | Guaranteed |
-| `bounded`           | Rejected           | Hardware-dependent |
+| `viewer`            | Guaranteed         | Guaranteed |
+| `local`             | Hardware-dependent | Guaranteed |
+| `local-floor`       | Hardware-dependent | Guaranteed |
+| `bounded-floor`     | Rejected           | Hardware-dependent |
 | `unbounded`         | Rejected           | Hardware-dependent |
 
 ## Appendix B: Proposed partial IDL
@@ -437,8 +426,6 @@ partial dictionary XRSessionCreationOptions {
 };
 
 partial interface XRSession {
-  readonly attribute XRSpace viewerSpace;
-
   Promise<XRReferenceSpace> requestReferenceSpace(XRReferenceSpaceType type);
 };
 
@@ -491,16 +478,15 @@ interface XRPose {
 //
 
 enum XRReferenceSpaceType {
-  "identity",
-  "position-disabled"
-  "eye-level",
-  "floor-level",
-  "bounded",
+  "viewer",
+  "local",
+  "local-floor",
+  "bounded-floor",
   "unbounded"
 };
 
 [SecureContext, Exposed=Window] interface XRReferenceSpace : XRSpace {
-  attribute XRRigidTransform originOffset;
+  XRReferenceSpace getOffsetReferenceSpace(XRRigidTransform originOffset);
 
   attribute EventHandler onreset;
 };
