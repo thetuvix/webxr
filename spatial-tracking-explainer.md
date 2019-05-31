@@ -231,13 +231,13 @@ For example, it is common in VR experiences to let the world drag along with the
 In contrast, many motion controllers have their own inertial tracking that can continue updating orientation while positional tracking is lost. If using a controller primarily to target distant objects, developers may choose to simply ignore `XRPose.emulatedPosition` and continue to point using each frame's updated target ray as the user rotates the controller. If using a controller to do fine operations, such as painting at the controller's tip, developers may instead choose to stop painting when `XRPose.emulatedPosition` becomes false, ensuring that only high-quality paint strokes are drawn.
 
 #### Tracking recovery
-As discussed above, during tracking loss, the viewer's pose will remain at their last-known position within each reference space, while continuing to incorporate orientation updates and any slight adjustments due to neck modeling. When the viewer then recovers positional tracking, developers may observe an instantaneous jump of the viewer pose. If the application continues to render during this time, the world will appear to drag along as the viewer moves around.
+As discussed above, during tracking loss, the viewer's pose will remain at their last-known position within each reference space, while continuing to incorporate orientation updates and any slight adjustments due to neck modeling. If the application continues to render during this time, the world will appear to drag along as the viewer moves around.
 
 When the viewer then recovers positional tracking, the origin of each `local`, `local-floor`, `bounded-floor` and `unbounded` reference space will continue to track the same physical location as it did before tracking was lost. Therefore, in the first frame where the viewer pose's `emulatedPosition` is false again, the developer will observe an abrupt jump in the viewer pose back to its tracked position.
 
-For stationary experiences and bounded experiences without a "teleportation" mechanic, this is generally the desired behavior. For example, a seated VR racing experience may align the driver seat's head position to the eye-level origin of its `local` reference space, centering the user in the driver seat when they are centered in their physical chair. By snapping the viewer pose back into position after tracking recovery, the experience remains centered around the user's physical chair.
+For experiences without a "teleportation" mechanic, this is generally the desired behavior. For example, a seated VR racing experience may align the driver seat's head position to the eye-level origin of its `local` reference space, centering the user in the driver seat when they are centered in their physical chair. By snapping the viewer pose back into position after tracking recovery, the experience remains centered around the user's physical chair.
 
-However, if a bounded experience does provide a "teleportation" mechanic, where the user can move through the virtual world without moving physically, it may be needlessly jarring to jump the user's position back after tracking recovery, since the exact mapping of the bounded reference space to the real world quickly becomes arbitrary anyway. Instead, when a bounded experience recovers tracking, it can simply resume the experience from the user's current position in the virtual world by absorbing that sudden jump into its teleportation offset. To do so, the developer detects that tracking was recovered this frame by observing a viewer pose where the `emulatedPosition` value is once again false, and then creates a replacement `bounded-floor` reference space with its `originOffset` adjusted by the amount that the viewer's position jumped since the previous frame. `originOffset` is described in the [Application supplied transforms section](#application-supplied-transforms).
+However, if an experience does provide a "teleportation" mechanic, where the user can move through the virtual world without moving physically, it may be needlessly jarring to jump the user's position back after tracking recovery, since the exact mapping of the bounded reference space to the real world quickly becomes arbitrary anyway. Instead, when such an experience recovers tracking, it can simply resume the experience from the user's current position in the virtual world by absorbing that sudden jump into its teleportation offset. To do so, the developer detects that tracking was recovered this frame by observing a viewer pose where the `emulatedPosition` value is once again false, and then calls `getOffsetReferenceSpace()` to create a replacement reference space with its `originOffset` adjusted by the amount that the viewer's position jumped since the previous frame. `originOffset` is described in the [Application supplied transforms section](#application-supplied-transforms).
 
 One exception to a reference space origin continuing to track its previous physical location is when the viewer regains positional tracking in a new area where the reference space's original physical origin can no longer be located. This may occur for a few reasons:
 * For a `bounded-floor` reference space, the user may walk far enough to transition from the bounds of one user-defined playspace to another. In this case, the origin of the `bounded-floor` reference space will snap to the defined origin of the new playspace bounds.
@@ -245,12 +245,12 @@ One exception to a reference space origin continuing to track its previous physi
 
 In both cases above, the `onreset` event will fire for each affected reference space, indicating that the physical location of its origin has experienced a sudden discontinuity. Note that the `onreset` event fires only when the origin of the reference space itself jumps in the physical world, not when the viewer pose jumps within a stable reference space.
 
-When an input source recovers positional tracking, its pose will instantly jump back into position. If the device tracks the input source relative to the viewer (e.g. a motion controller tracked by headset cameras) and the viewer itself still does not have positional tracking, the input source pose will continue to have an `emulatedPosition` value of true in any space other than viewer space. Once the input source's position in the requested space is known again, `emulatedPosition` will become false.
+When an input source recovers positional tracking, its pose will instantly jump back into position. If the device tracks the input source relative to the viewer (e.g. a motion controller tracked by headset cameras) and the viewer itself still does not have positional tracking, the input source pose will continue to have an `emulatedPosition` value of true in any base space other than the `viewer` reference space. Once the input source's position in the requested space is known again, `emulatedPosition` will become false.
 
 ### Application-supplied transforms
 Frequently developers will want to provide an additional, artificial transform on top of the user's tracked motion to allow the user to navigate larger virtual scenes than their tracking systems or physical space allows. This effect is traditionally accomplished by mathematically combining the API-provided transform with the desired additional application transforms. WebXR offers developers a simplification to ensure that all tracked values, such as viewer and input poses, are transformed consistently.
 
-Developers can specify application-specific transforms by calling the getOffsetReferenceSpace() method of any XRReferenceSpace. This returns a new XRReferenceSpace where the XRRigidTransform passed to getOffsetReferenceSpace() describes the position and orientation of the offset space's origin in relation to the base reference space's origin. Specifically, the originOffset contains the pose of the new origin relative to the base reference space's origin. If the base reference space was also created with getOffsetReferenceSpace(), the overall offset is the combination of both transforms.
+Developers can specify application-specific transforms by calling the `getOffsetReferenceSpace()` method of any `XRReferenceSpace`. This returns a new `XRReferenceSpace` where the `XRRigidTransform` passed to `getOffsetReferenceSpace()` describes the position and orientation of the offset space's origin in relation to the base reference space's origin. Specifically, the `originOffset` contains the pose of the new origin relative to the base reference space's origin. If the base reference space was also created with `getOffsetReferenceSpace()`, the overall offset is the combination of both transforms.
 
 A common use case for this attribute would be for a "teleportation" mechanic, where the user "jumps" to a new point in the virtual scene, after which the selected point is treated as the new virtual origin which all tracked motion is relative to.
 
@@ -329,13 +329,13 @@ function onSessionStarted(session) {
 }
 ```
 
-### Floor Alignment
+### Floor alignment
 Some XR hardware with inside-out tracking has users establish "known spaces" that can be used to easily provide `bounded-floor` and `local-floor` reference spaces.  On inside-out XR hardware which does not intrinsically provide these known spaces, the User Agent must still provide `local-floor` reference spaces. It may do so by estimating a floor level, but may not present any UI at the time the reference space is requested.  
 
 Additionally, XR hardware with orientation-only tracking may also provide an emulated value for the floor offset of a `local-floor` reference space. On these devices, it is recommended that the User Agent or underlying platform provide a setting for users to customize this value.
 
-### Reset Event
-The `XRReferenceSpace` type has an event, `onreset`, that is fired when there is a discontinuity of the location of the reference space's origin in the physical world.  This discontinuity may be caused for different reasons for each type, but the result is essentially the same, the perception of the user's location will have changed.  In response, pages may wish to reposition virtual elements in the scene or clear any additional transforms, such as teleportation transforms, that may no longer be needed.  The `onreset` event will fire prior to any poses being delivered with the new origin/direction, and all poses queried following the event must be relative to the reset origin/direction. The `transform` value in the `onreset` event data indicates the size of the jump of the reference space origin in the physical world, if known.
+### Reference space reset event
+The `XRReferenceSpace` type has an event, `onreset`, that is fired when there is a discontinuity of the location of the reference space's origin in the physical world.  This discontinuity may be caused for different reasons for each type, but the result is essentially the same, the perception of the user's location will have changed.  In response, pages may wish to reposition virtual elements in the scene or clear any additional transforms, such as teleportation transforms, that may no longer be needed.  The `onreset` event will fire prior to any poses being delivered with the new origin/direction, and all poses queried following the event must be relative to the reset origin/direction. The `transform` value in the `onreset` event data indicates the specific jump of the reference space origin in the physical world, if known.
 
 ```js
 xrReferenceSpace.addEventListener('reset', xrReferenceSpaceEvent => {
@@ -363,7 +363,7 @@ The `onreset` event will **NOT** fire when a reference space regains tracking of
 
 ## Appendix A : Miscellaneous
 
-### Tracking Systems Overview
+### Tracking systems overview
 In the context of XR, the term _tracking system_ refers to the technology by which an XR device is able to determine a user's motion in 3D space.  There is a wide variance in the capability of tracking systems.
 
 **Orientation-only** tracking systems typically use accelerometers to determine the yaw, pitch, and roll of a user's head.  This is often paired with a technique known as _neck-modeling_ that adds simulated position changes based on an estimation of the orientation changes originating from a point aligned with a simulated neck position.
@@ -377,7 +377,7 @@ In the context of XR, the term _tracking system_ refers to the technology by whi
 How to pick a reference space:
 ![Flow chart](images/frame-of-reference-flow-chart.jpg)
 
-### Reference Space Examples
+### Reference space examples
 
 | Type                | Examples                                      |
 | ------------        | --------------------------------------------- |
@@ -387,7 +387,7 @@ How to pick a reference space:
 | `bounded-floor`     | - VR painting/sculpting tool<br>- Training simulators<br>- Dance games<br>- Previewing of 3D objects in the real world |
 | `unbounded`         | - Campus tour<br>- Renovation preview |
 
-### XRReferenceSpace Availability
+### XRReferenceSpace availability
 
 **Guaranteed** The UA will always be able to provide this reference space 
 
