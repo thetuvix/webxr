@@ -216,9 +216,9 @@ While the `baseSpace` parameter may be any `XRSpace`, developers will often choo
 ```
 
 #### Tracking loss
-Developers should check initially that the result from `getPose()` is not null, as the pose of `space` within `baseSpace` may not have been established yet. For example, a viewer may not yet have been tracked within the application's `XRReferenceSpace`, or a motion controller may not yet have been observed after the user turned it on.
+Developers should check initially that the result from `getPose()` is not null, as the pose of `space` within `baseSpace` may not have been established yet. For example, a viewer may not yet have been tracked within the application's primary reference space, or a motion controller may not yet have been observed after the user turned it on.
 
-However, once a pose is initially established for a viewer or input source, pose matrices should continue to be provided even during tracking loss. The `emulatedPosition` attribute of `XRPose` indicates that the position component of the retrieved pose matrix does not represent an actively tracked position. There are a number of reasons this might be the case. For example:
+However, once a pose is initially established for a space (e.g. a `viewer` reference space or an input source's `gripSpace`), pose matrices should continue to be provided even during tracking loss. The `emulatedPosition` attribute of `XRPose` indicates that the position component of the retrieved pose matrix does not represent an actively tracked position. There are a number of reasons this might be the case. For example:
 * A viewer with orientation-only tracking, whose position within a `local` reference space represents neck modeling.
 * A viewer that has temporarily lost positional tracking, whose position within a reference space represents the viewer's last-known position in that space, plus inertial dead reckoning and/or neck modeling to continue providing a position.
 * A motion controller with orientation-only tracking, which is positioned at an assumed position, e.g. by the user's hip.
@@ -275,16 +275,6 @@ It is expected that developers will often choose to preview `immersive` experien
 
 #### Unbounded to Bounded 
 When building an experience that is predominantly based on an `unbounded` reference space, developers may occasionally choose to switch to a `bounded-floor` reference space. For example, a whole-home renovation experience might choose to switch to a `bounded-floor` reference space for reviewing a furniture selection library.  If necessary to continue displaying content belonging to the previous reference space, developers may call the `XRFrame`'s `getPose()` method to re-parent nearby virtual content to the new reference space.
-
-#### Viewer space
-Calls to `XRFrame.getViewerPose()` return an `XRViewerPose` object which contains the pose of the viewer along with the views to be rendered. However, sometimes it is useful to have access to the `XRSpace` represented by the viewer directly, such when the developer wants to use it to compare locations against other `XRSpace` objects. The developer can access the viewer space through `XRSession.viewerSpace` and then use that in calls to `getPose()`.
-
-```js
-  let pose = xrFrame.getPose(preferredInputSource.gripSpace, xrSession.viewerSpace);
-  if (pose) {
-    // Calculate how far the motion controller is from the user's head
-  }
-```
 
 ### Click-and-drag view controls
 Frequently with inline sessions it's desirable to have the view rotate when the user interacts with the inline canvas. This is useful on devices without tracking capabilities to allow users to still view the full scene, but can also be desirable on devices with some tracking capabilities, such as a mobile phone or tablet, as a way to adjust the users view without requiring them to physically turn around.
