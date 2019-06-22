@@ -241,7 +241,7 @@ However, if an experience does provide a "teleportation" mechanic, where the use
 
 One exception to a reference space origin continuing to track its previous physical location is when the viewer regains positional tracking in a new area where the reference space's original physical origin can no longer be located. This may occur for a few reasons:
 * For a `bounded-floor` reference space, the user may walk far enough to transition from the bounds of one user-defined playspace to another. In this case, the origin of the `bounded-floor` reference space will snap to the defined origin of the new playspace bounds.
-* For an `unbounded` reference space, the user may walk through a dark hallway and regain tracking in a new room, with the system not knowing the spatial relationship between the two rooms. In this case, the origin of the `unbounded` reference space will snap to the position in the new room that results in the viewer's pose continuing seamlessly at the same coordinates in that reference space.
+* For an `unbounded` reference space, the user may walk through a dark hallway and regain tracking in a new room, with the system not knowing the spatial relationship between the two rooms. In this case, the origin of the `unbounded` reference space will end up at an arbitrary position in the new room, perhaps resetting the viewer's pose to be identity in that reference space.
 
 In both cases above, the `onreset` event will fire for each affected reference space, indicating that the physical location of its origin has experienced a sudden discontinuity. Note that the `onreset` event fires only when the origin of the reference space itself jumps in the physical world, not when the viewer pose jumps within a stable reference space.
 
@@ -356,7 +356,7 @@ xrReferenceSpace.addEventListener('reset', xrReferenceSpaceEvent => {
 Example reasons `onreset` may fire:
 * For a `local` or `local-floor` reference space, some XR systems have a mechanism for allowing the user to reset which direction is "forward" or re-center the scene's origin at their current location.
 * For a `bounded-floor` reference space, a user steps outside the bounds of a "known" playspace and enters a different "known" playspace
-* For a `bounded-floor` reference space, an inside-out based tracking system is temporarily unable to locate the user (e.g. due to poor lighting conditions in a dark hallway) and then recovers tracking in a new map fragment that cannot be related to the previous map fragment
+* For an `unbounded` reference space, an inside-out based tracking system is temporarily unable to locate the user (e.g. due to poor lighting conditions in a dark hallway) and then recovers tracking in a new map fragment that cannot be related to the previous map fragment
 * For an `unbounded` reference space, when the user has travelled far enough from the origin of the reference space that floating point error would become problematic
 
 The `onreset` event will **NOT** fire when a reference space regains tracking of its previous physical origin, even if the viewer's pose suddenly jumps back into position, as the origin itself did not experience a discontinuity. The `onreset` event will also **NOT** fire as an `unbounded` reference space makes small changes to its origin as part of maintaining space stability near the user; these are considered minor corrections rather than a discontinuity in the origin.
