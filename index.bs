@@ -562,7 +562,7 @@ When any previously added <dfn for="XRSession" lt="remove input source">[=XR inp
 
 <div class="algorithm" data-algorithm="on-input-source-change">
 
-When the {{XRInputSource/handedness}}, {{XRInputSource/targetRayMode}}, or presence of a {{XRInputSource/gripSpace}} or {{XRInputSource/gamepad}} for any [=XR input source=]s change for {{XRSession}} |session|, the user agent MUST run the following steps:
+When the {{XRInputSource/handedness}}, {{XRInputSource/targetRayMode}}, or presence of an {{XRInputSource/gripSpace}} or {{XRInputSource/gamepad}} for any [=XR input source=]s change for {{XRSession}} |session|, the user agent MUST run the following steps:
 
   1. Let |added| be a new [=/list=].
   1. Let |removed| be a new [=/list=].
@@ -768,7 +768,7 @@ Frame Loop {#frame}
 XRFrame {#xrframe-interface}
 -------------------
 
-An {{XRFrame}} represents a snapshot of the state of all of the tracked objects for an {{XRSession}}. Applications can acquire an {{XRFrame}} by calling {{XRSession/requestAnimationFrame()}} on an {{XRSession}} with an {{XRFrameRequestCallback}}. When the callback is called it will be passed an {{XRFrame}}. Events which need to communicate tracking state, such as the {{select}} event, will also provide a {{XRFrame}}.
+An {{XRFrame}} represents a snapshot of the state of all of the tracked objects for an {{XRSession}}. Applications can acquire an {{XRFrame}} by calling {{XRSession/requestAnimationFrame()}} on an {{XRSession}} with an {{XRFrameRequestCallback}}. When the callback is called it will be passed an {{XRFrame}}. Events which need to communicate tracking state, such as the {{select}} event, will also provide an {{XRFrame}}.
 
 <pre class="idl">
 [SecureContext, Exposed=Window] interface XRFrame {
@@ -939,8 +939,7 @@ When an {{XRReferenceSpace}} is requested, the user agent MUST <dfn>create a ref
 <div class="algorithm" data-algorithm="reference-space-supported">
 To check if a <dfn>reference space is supported</dfn> for a given reference space type |type| and {{XRSession}} |session|, run the following steps:
 
-
-  1. If |type| is {{inline}}, return <code>true</code>.
+  1. If |type| is {{viewer}}, return <code>true</code>.
   1. If |type| is {{local}} or {{local-floor}}, and |session| is an [=immersive session=], return <code>true</code>.
   1. If |type| is {{local}} or {{local-floor}}, and the [=/XR device=] supports reporting orientation data, return <code>true</code>.
   1. If |type| is {{bounded-floor}} and |session| is an [=immersive session=], return if [=bounded reference spaces are supported=] by the [=/XR device=].
@@ -980,7 +979,7 @@ interface XRBoundedReferenceSpace : XRReferenceSpace {
 };
 </pre>
 
-The origin of a {{XRBoundedReferenceSpace}} MUST be positioned at the floor, such that the <code>y</code> axis equals <code>0</code> at floor level. The <code>x</code> and <code>z</code> position and orientation are initialized based on the conventions of the underlying platform, typically expected to be near the center of the room facing in a logical forward direction.
+The origin of an {{XRBoundedReferenceSpace}} MUST be positioned at the floor, such that the <code>y</code> axis equals <code>0</code> at floor level. The <code>x</code> and <code>z</code> position and orientation are initialized based on the conventions of the underlying platform, typically expected to be near the center of the room facing in a logical forward direction.
 
 Note: Other XR platforms sometimes refer to the type of tracking offered by a {{bounded-floor}} reference space as "room scale" tracking. An {{XRBoundedReferenceSpace}} is not intended to describe multi-room spaces, areas with uneven floor levels, or very large open areas. Content that needs to handle those scenarios should use an {{unbounded}} reference space.
 
@@ -1062,7 +1061,7 @@ The <dfn attribute for="XRViewport">x</dfn> and <dfn attribute for="XRViewport">
 
 The exact interpretation of the viewport values depends on the conventions of the graphics API the viewport is associated with:
 
- - When used with a {{XRWebGLLayer}} the {{XRViewport/x}} and {{XRViewport/y}} attributes specify the lower left corner of the viewport rectangle, in pixels, with the viewport rectangle extending {{XRViewport/width}} pixels to the right of {{XRViewport/x}} and {{XRViewport/height}} pixels above {{XRViewport/y}}. The values can be passed to the [=WebGL viewport=] function directly.
+ - When used with an {{XRWebGLLayer}} the {{XRViewport/x}} and {{XRViewport/y}} attributes specify the lower left corner of the viewport rectangle, in pixels, with the viewport rectangle extending {{XRViewport/width}} pixels to the right of {{XRViewport/x}} and {{XRViewport/height}} pixels above {{XRViewport/y}}. The values can be passed to the [=WebGL viewport=] function directly.
 
 <div class="example">
 The following code loops through all of the {{XRView}}s of an {{XRViewerPose}}, queries an {{XRViewport}} from an {{XRWebGLLayer}} for each, and uses them to set the appropriate [=WebGL viewport=]s for rendering.
@@ -1126,7 +1125,7 @@ To <dfn>normalize</dfn> a list of components the UA MUST perform the following s
 XRRigidTransform {#xrrigidtransform-interface}
 ----------------
 
-An {{XRRigidTransform}} is a transform described by a {{XRRigidTransform/position}} and {{XRRigidTransform/orientation}}. When interpreting an {{XRRigidTransform}} the {{XRRigidTransform/orientation}} is always applied prior to the {{XRRigidTransform/position}}.
+An {{XRRigidTransform}} is a transform described by an {{XRRigidTransform/position}} and {{XRRigidTransform/orientation}}. When interpreting an {{XRRigidTransform}} the {{XRRigidTransform/orientation}} is always applied prior to the {{XRRigidTransform/position}}.
 
 An {{XRRigidTransform}} contains an <dfn for=XRRigidTransform>internal matrix</dfn> which is a [=/matrix=].
 
@@ -1181,9 +1180,9 @@ To <dfn for=XRRigidTransform>obtain the matrix</dfn> for a given {{XRRigidTransf
 
 </div>
 
-The <dfn attribute for="XRRigidTransform">inverse</dfn> attribute returns a {{XRRigidTransform}} which, if applied to an object that had previously been transformed by the original {{XRRigidTransform}}, would undo the transform and return the object to its initial pose. This attribute SHOULD be lazily evaluated. The {{XRRigidTransform}} returned by {{inverse}} MUST return the originating {{XRRigidTransform}} as its {{inverse}}.
+The <dfn attribute for="XRRigidTransform">inverse</dfn> attribute returns an {{XRRigidTransform}} which, if applied to an object that had previously been transformed by the original {{XRRigidTransform}}, would undo the transform and return the object to its initial pose. This attribute SHOULD be lazily evaluated. The {{XRRigidTransform}} returned by {{inverse}} MUST return the originating {{XRRigidTransform}} as its {{inverse}}.
 
-An {{XRRigidTransform}} with a {{XRRigidTransform/position}} of <code>{ x: 0, y: 0, z: 0 w: 1 }</code> and an {{XRRigidTransform/orientation}} of <code>{ x: 0, y: 0, z: 0, w: 1 }</code> is known as an <dfn>identity transform</dfn>.
+An {{XRRigidTransform}} with an {{XRRigidTransform/position}} of <code>{ x: 0, y: 0, z: 0 w: 1 }</code> and an {{XRRigidTransform/orientation}} of <code>{ x: 0, y: 0, z: 0, w: 1 }</code> is known as an <dfn>identity transform</dfn>.
 
 <div class="algorithm" data-algorithm="multiply transforms">
 
@@ -1204,7 +1203,7 @@ NOTE: This is equivalent to constructing an {{XRRigidTransform}} whose {{XRRigid
 XRRay {#xrray-interface}
 -----
 
-An {{XRRay}} is a geometric ray described by a {{XRRay/origin}} point and {{XRRay/direction}} vector.
+An {{XRRay}} is a geometric ray described by an {{XRRay/origin}} point and {{XRRay/direction}} vector.
 
 An {{XRRay}} contains an <dfn for=XRRay>internal matrix</dfn> which is a [=/matrix=].
 
@@ -1385,7 +1384,7 @@ Each [=XR input source=] SHOULD define a <dfn>primary action</dfn>. The [=primar
 
 When an [=XR input source=] for {{XRSession}} |session| begins its [=primary action=] the UA MUST run the following steps:
 
-  1. [=Queue a task=] to [=fire an event|fire=] a {{XRInputSourceEvent}} named {{selectstart!!event}} on |session|.
+  1. [=Queue a task=] to [=fire an event|fire=] an {{XRInputSourceEvent}} named {{selectstart!!event}} on |session|.
 
 </div>
 
@@ -1405,7 +1404,7 @@ Sometimes platform-specific behavior can result in a [=primary action=] being in
 
 When an [=XR input source=] for {{XRSession}} |session| has its [=primary action=] cancelled the UA MUST run the following steps:
 
-  1. [=Queue a task=] to [=fire an event|fire=] a {{XRInputSourceEvent}} named {{selectend!!event}} on |session|.
+  1. [=Queue a task=] to [=fire an event|fire=] an {{XRInputSourceEvent}} named {{selectend!!event}} on |session|.
 
 </div>
 
@@ -1506,7 +1505,7 @@ The WebXR Device API extends the {{GamepadMappingType}} to describe the mapping 
 
 The <dfn enum-value for="GamepadMappingType">xr-standard</dfn> mapping indicates that the layout of the buttons and axes of the {{XRInputSource/gamepad}} corresponds as closely as possible to the tables below.
 
-In order to report a {{Gamepad/mapping}} of {{GamepadMappingType/xr-standard}} the device MUST report a {{XRInputSource/targetRayMode}} of {{XRTargetRayMode/tracked-pointer}} and MUST have a non-<code>null</code> {{XRInputSource/gripSpace}}. It also MUST have at least one touchpad or joystick and MUST have at least one primary button, often a trigger, separate from the touchpad or joystick. If a device does not meet the requirements for the {{GamepadMappingType/xr-standard}} mapping it may still be exposed on an {{XRInputSource}} with the <code>""</code> (empty string) mapping. The {{GamepadMappingType/xr-standard}} mapping MUST only be used by {{Gamepad}} instances reported by an {{XRInputSource}}.
+In order to report a {{Gamepad/mapping}} of {{GamepadMappingType/xr-standard}} the device MUST report an {{XRInputSource/targetRayMode}} of {{XRTargetRayMode/tracked-pointer}} and MUST have a non-<code>null</code> {{XRInputSource/gripSpace}}. It also MUST have at least one touchpad or joystick and MUST have at least one primary button, often a trigger, separate from the touchpad or joystick. If a device does not meet the requirements for the {{GamepadMappingType/xr-standard}} mapping it may still be exposed on an {{XRInputSource}} with the <code>""</code> (empty string) mapping. The {{GamepadMappingType/xr-standard}} mapping MUST only be used by {{Gamepad}} instances reported by an {{XRInputSource}}.
 
 <table class="tg">
   <thead>
@@ -1663,7 +1662,7 @@ The <dfn constructor for="XRWebGLLayer">XRWebGLLayer(|session|, |context|, |laye
 
 </div>
 
-Note: If a {{XRWebGLLayer}}'s [=XRWebGLLayer/composition disabled=] boolean is set to <code>true</code> all values on the {{XRWebGLLayerInit}} object are ignored, since the {{WebGLRenderingContext}}'s default framebuffer was already allocated using the context's [=actual context parameters=] and cannot be overridden.
+Note: If an {{XRWebGLLayer}}'s [=XRWebGLLayer/composition disabled=] boolean is set to <code>true</code> all values on the {{XRWebGLLayerInit}} object are ignored, since the {{WebGLRenderingContext}}'s default framebuffer was already allocated using the context's [=actual context parameters=] and cannot be overridden.
 
 The <dfn attribute for="XRWebGLLayer">context</dfn> attribute is the {{WebGLRenderingContext}} the {{XRWebGLLayer}} was created with.
 
@@ -1675,7 +1674,7 @@ An <dfn>opaque framebuffer</dfn> functions identically to a standard {{WebGLFram
 
  - An [=opaque framebuffer=] MAY support antialiasing, even in WebGL 1.0.
  - An [=opaque framebuffer=]'s attachments cannot be inspected or changed. Calling {{framebufferTexture2D}}, {{framebufferRenderbuffer}}, {{getFramebufferAttachmentParameter}}, or {{getRenderbufferParameter}} with an [=opaque framebuffer=] MUST generate an {{INVALID_OPERATION}} error.
- - An [=opaque framebuffer=] is considered incomplete outside of an {{XRSession/requestAnimationFrame()}} callback. When not in a {{XRSession/requestAnimationFrame()}} callback calls to {{checkFramebufferStatus}} outside of an {{XRSession/requestAnimationFrame()}} callback MUST generate a {{FRAMEBUFFER_UNSUPPORTED}} error and attempts to clear, draw to, or read from the [=opaque framebuffer=] MUST generate an {{INVALID_FRAMEBUFFER_OPERATION}} error.
+ - An [=opaque framebuffer=] is considered incomplete outside of an {{XRSession/requestAnimationFrame()}} callback. When not in an {{XRSession/requestAnimationFrame()}} callback calls to {{checkFramebufferStatus}} outside of an {{XRSession/requestAnimationFrame()}} callback MUST generate a {{FRAMEBUFFER_UNSUPPORTED}} error and attempts to clear, draw to, or read from the [=opaque framebuffer=] MUST generate an {{INVALID_FRAMEBUFFER_OPERATION}} error.
 
 Each {{XRWebGLLayer}} has a <dfn for="XRWebGLLayer">target framebuffer</dfn>, which is the {{XRWebGLLayer/framebuffer}} if [=XRWebGLLayer/composition disabled=] is <code>false</code>, and the [=XRWebGLLayer/context=]'s default framebuffer otherwise.
 
@@ -1976,7 +1975,7 @@ A user agent MUST dispatch a <dfn event for="XRSession">selectend</dfn> event on
 
 A user agent MUST dispatch a <dfn event for="XRSession">select</dfn> event on an {{XRSession}} when one of its {{XRInputSource}}s has fully completed a [=primary action=]. The event MUST be of type {{XRInputSourceEvent}}.
 
-A user agent MUST dispatch a <dfn event for="XRReferenceSpace">reset</dfn> event on an {{XRReferenceSpace}} when discontinuities of the [=native origin=] or [=effective origin=] occur, i.e. there are significant changes in the origin’s position or orientation relative to the user’s environment. (For example: After user recalibration of their XR device or if the XR device automatically shifts its origin after losing and regaining tracking.) A {{reset}} event MUST also be dispatched when the {{boundsGeometry}} changes for a {{XRBoundedReferenceSpace}}. A {{reset}} event MUST NOT be dispatched if the [=viewer=]'s pose experiences discontinuities but the {{XRReferenceSpace}}'s origin physical mapping remains stable, such as when the [=viewer=] momentarily loses and regains tracking within the same tracking area. A {{reset}} event also MUST NOT be dispatched as an {{unbounded}} reference space makes small adjustments to its [=native origin=] over time to maintain space stability near the user, if a significant discontinuity has not occurred. The event MUST be of type {{XRReferenceSpaceEvent}}, and MUST be dispatched prior to the execution of any [=XR animation frame=]s that make use of the new origin.
+A user agent MUST dispatch a <dfn event for="XRReferenceSpace">reset</dfn> event on an {{XRReferenceSpace}} when discontinuities of the [=native origin=] or [=effective origin=] occur, i.e. there are significant changes in the origin’s position or orientation relative to the user’s environment. (For example: After user recalibration of their XR device or if the XR device automatically shifts its origin after losing and regaining tracking.) A {{reset}} event MUST also be dispatched when the {{boundsGeometry}} changes for an {{XRBoundedReferenceSpace}}. A {{reset}} event MUST NOT be dispatched if the [=viewer=]'s pose experiences discontinuities but the {{XRReferenceSpace}}'s origin physical mapping remains stable, such as when the [=viewer=] momentarily loses and regains tracking within the same tracking area. A {{reset}} event also MUST NOT be dispatched as an {{unbounded}} reference space makes small adjustments to its [=native origin=] over time to maintain space stability near the user, if a significant discontinuity has not occurred. The event MUST be of type {{XRReferenceSpaceEvent}}, and MUST be dispatched prior to the execution of any [=XR animation frame=]s that make use of the new origin.
 
 NOTE: Jumps in [=viewer=] position can be handled by the application by observing the {{XRPose/emulatedPosition}} boolean. If a jump in [=viewer=] position coincides with {{XRPose/emulatedPosition}} switching from <code>true</code> to <code>false</code>, it indicates that the [=viewer=] has regained tracking and their new position represents a correction from the previously emulated values. For experiences without a "teleportation" mechanic, where the [=viewer=] can move through the virtual world without moving physically, this is generally the application's desired behavior. However, if an experience does provide a "teleportation" mechanic, it may be needlessly jarring to jump the [=viewer=]'s position back after tracking recovery. Instead, when such an application recovers tracking and receives a {{reset}} event, it can simply resume the experience from the [=viewer=]'s current position in the virtual world by absorbing that sudden jump in position into its teleportation offset. To do so, the developer calls {{getOffsetReferenceSpace()}} to create a replacement reference space with its |originOffset| adjusted by the amount that the [=viewer=]'s position jumped since the previous frame.
 
