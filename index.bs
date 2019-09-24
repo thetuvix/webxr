@@ -1008,7 +1008,7 @@ To <dfn>populate the pose</dfn> of an {{XRSpace}} |space| in an {{XRSpace}} |bas
         <dd> Set |transform|'s {{XRRigidTransform/position}} to the position of |space|'s [=effective origin=] in |baseSpace|'s [=coordinate system=].
         <dd> Set |pose|'s {{XRPose/emulatedPosition}} to <code>false</code>.
 
-      <dt> Else if |limit| is <code>false</code> the tracking system provides a [=3DoF=] pose or a [=6DoF=] pose whose position is neither actively tracked nor statically known for |space|'s pose relative to |baseSpace|:
+      <dt> Else if |limit| is <code>false</code> and the tracking system provides a [=3DoF=] pose or a [=6DoF=] pose whose position is neither actively tracked nor statically known for |space|'s pose relative to |baseSpace|:
         <dd> Set |transform|'s {{XRRigidTransform/orientation}} to the orientation of |space|'s [=effective origin=] in |baseSpace|'s [=coordinate system=].
         <dd> Set |transform|'s {{XRRigidTransform/position}} to the tracking system's best estimate of the position of |space|'s [=effective origin=] in |baseSpace|'s [=coordinate system=]. This MAY include a computed offset such as a neck or arm model. If a position estimate is not available, the last known position MUST be used.
         <dd> Set |pose|'s {{XRPose/emulatedPosition}} to <code>true</code>.
