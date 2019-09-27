@@ -31,7 +31,7 @@ This document explains the portion of the WebXR APIs for managing input across t
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
 ## Concepts
-In addition to the diversity of tracking and display technology, XR hardware may support a wide variety of input mechanisms including screen taps, motion controllers (with multiple buttons, joysticks, triggers, touchpads, etc), voice commands, spatially-tracked articulated hands, single button clickers, and more. Despite this variation, all XR input mechanisms have a common purpose: enabling users to aim in 3D space and perform an action on the target of that aim. This concept is known as "target and select" and is the foundation for how input is exposed in WebXR.
+In addition to the diversity of tracking and display technology, XR hardware may support a wide variety of input mechanisms including screen taps, motion controllers (with multiple buttons, joysticks, triggers, touchpads, force sensors, etc), voice commands, spatially-tracked articulated hands, single button clickers, and more. Despite this variation, all XR input mechanisms have a common purpose: enabling users to aim in 3D space and perform an action on the target of that aim. This concept is known as "target and select" and is the foundation for how input is exposed in WebXR.
 
 ### Targeting categories
 All WebXR input sources can be divided into one of three categories based on the method by which users must target: 'gaze', 'tracked-pointer', and 'screen'.
@@ -86,7 +86,7 @@ function onInputSourcesChange(event) {
 ### Targeting ray pose
 The `targetRaySpace` attribute of an `XRInputSource` is an `XRSpace` representing the inputs source's targeting ray origin and direction in space. (For more information on `XRSpace`s, see the [Spatial Relationships](spatial-tracking-explainer.md#spatial-relationships) section in the Spatial Tracking explainer). All `XRInputSource` objects, regardless of the `targetRayMode`, will have a valid `targetRaySpace`. As mentioned in the [Targeting Categories](#targeting-categories) section, the location of this `targetRaySpace` will vary based on the `targetRayMode`. For example, all `XRInputSource`s with a `targetRayMode` of 'gaze' will have the same `XRSpace` object as the `targetRaySpace`. This common `targetRaySpace` will represent the same location as the `XRSession.viewerSpace`, but will be a different object in order to keep the API flexible enough to add eye tracking in the future. Alternatively, the `targetRaySpace` of an input source with the `targetRayMode` of `tracked-pointer` will be based on the spatial location of the physical input device.
 
-Th location of the `targetRaySpace` can be determined for a given frame by passing it to `XRFrame.getPose()` as the `space` parameter. Developers will likely supply their active `XRReferenceSpace` as the `relativeTo` parameter so they can use a consistent coordinate system, though this is not required. The result from `getPose()` should always be verified as the function may return `null` in cases where tracking has been lost or the `XRInputSource` instance is no longer connected or available.
+The location of the `targetRaySpace` can be determined for a given frame by passing it to `XRFrame.getPose()` as the `space` parameter. Developers will likely supply their active `XRReferenceSpace` as the `relativeTo` parameter so they can use a consistent coordinate system, though this is not required. The result from `getPose()` should always be verified as the function may return `null` in cases where tracking has been lost or the `XRInputSource` instance is no longer connected or available.
 
 ```js
 let inputSourcePose = xrFrame.getPose(inputSource.targetRaySpace, xrReferenceSpace);
@@ -257,11 +257,11 @@ For `tracked-pointer` input sources, it is often appropriate for the application
 #### Choosing renderable models
 The WebXR Device API currently does not offer any way to retrieve renderable resources that represent the input devices from the API itself, and as such the `XRInputSource`'s `profiles` must be used to identify and load an appropriate resources. (For example, from the application's server, a CDN, or a local cache.) The `profiles` provides a list of strings that identify the device, given in descending order of preference.
 
-For example, the Samsung Odyssey controller is a variant of the standard Windows Mixed Reality controller. As a result, the `profiles` for that controller could be:
+For example, the Samsung HMD Odyssey's controller is a variant of the standard Windows Mixed Reality controller. As a result, the `profiles` for that controller could be:
 
 ```js
 // Exact strings are examples only.
-["samsung-odyssey", "windows-mixed-reality", "touchpad-thumbstick-controller"]
+["samsung-odyssey", "microsoft-mixed-reality", "generic-trigger-squeeze-touchpad-thumbstick"]
 ```
 
 Applications should iterate through the list until a string is located that corresponds to a known model, which should then be used when rendering the input device. The example below presumes that the `getInputSourceRenderableModel` call would do the required lookup and caching.
@@ -321,10 +321,21 @@ function updateRenderableInputModels(xrFrame) {
 
 The strings returned in the `profiles` array of an `XRInputSource` describe the device being used with varying levels of detail, ranging from exactly identifying the device to only giving a broad description of it's shape and capabilities. It's highly recommended that, when applicable, the last profile in the array be from a list of well-known "generic" profiles, given below.
 
- - **"button-controller":** A controller with at least one button/trigger but no touchpad or thumbstick. Controllers with this profile must use the `xr-standard` Gamepad mapping.
- - **"touchpad-controller"** A controller with a touchpad, but no thumbstick. If the controller also has at least one additional button or trigger it must use the `xr-standard` Gamepad mapping.
- - **"thumbstick-controller"** A controller with a thumbstick, but no touchpad. If the controller also has at least one additional button or trigger it must use the `xr-standard` Gamepad mapping.
- - **"touchpad-thumbstick-controller"** A controller with both a touchpad and a thumbstick. If the controller also has at least one additional button or trigger it must use the `xr-standard` Gamepad mapping.
+Note that the generic profiles exclude the button reserved by the user agent for its own purposes. For example, the Google Daydream controller has an App button and a touchpad, but most user agents will use the App button to show their own menu. Therefore, the App button does not count as a usable button when determining the Google Daydream controller's generic profile, which is simply `"generic-touchpad"`.
+
+Controllers with the following profiles **must not** use the `"xr-standard"` Gamepad mapping, as they do not have a trigger:
+ - **"generic-button"** A controller with an app-usable button, but no trigger.
+ - **"generic-touchpad"** A controller with a touchpad, but no trigger.
+
+Controllers with the following profiles (counting only app-usable controls) **must** use the `"xr-standard"` Gamepad mapping, as they do have a trigger:
+ - **"generic-trigger"** A controller with a trigger, but no thumbstick, touchpad or squeeze detection.
+ - **"generic-trigger-thumbstick"** A controller with an trigger and a thumbstick, but no touchpad or squeeze detection.
+ - **"generic-trigger-touchpad"** A controller with an trigger and a touchpad, but no thumbstick or squeeze detection.
+ - **"generic-trigger-touchpad-thumbstick"** A controller with a trigger, touchpad and thumbstick, but no squeeze detection.
+ - **"generic-trigger-squeeze"** A controller with a trigger and a squeeze detection, but no thumbstick or touchpad.
+ - **"generic-trigger-squeeze-thumbstick"** A controller with a trigger, squeeze detection and thumbstick, but no touchpad.
+ - **"generic-trigger-squeeze-touchpad"** A controller with a trigger, squeeze detection and touchpad, but no thumbstick.
+ - **"generic-trigger-squeeze-touchpad-thumbstick"** A controller with a trigger, squeeze detection, touchpad and thumbstick.
 
 More generic profiles may be added to this list over time as new common form factors are observed.
 
