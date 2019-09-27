@@ -171,7 +171,7 @@ Application flow {#applicationflow}
 
 Most applications using the WebXR Device API will follow a similar usage pattern:
 
-  * Query {{XR/supportsSession()|navigator.xr.supportsSession()}} to determine if the desired type of XR content is supported by the hardware and UA.
+  * Query {{XR/isSessionSupported()|navigator.xr.isSessionSupported()}} to determine if the desired type of XR content is supported by the hardware and UA.
   * If so, advertise the XR content to the user.
   * Wait for the user to [=triggered by user activation|trigger a user activation event=] indicating they want to begin viewing XR content.
   * Request an {{XRSession}} within the user activation event with {{XR/requestSession()|navigator.xr.requestSession()}}.
@@ -214,7 +214,7 @@ XR {#xr-interface}
 <pre class="idl">
 [SecureContext, Exposed=Window] interface XR : EventTarget {
   // Methods
-  Promise&lt;void&gt; supportsSession(XRSessionMode mode);
+  Promise&lt;boolean&gt; isSessionSupported(XRSessionMode mode);
   [NewObject] Promise&lt;XRSession&gt; requestSession(XRSessionMode mode, optional XRSessionInit options = {});
 
   // Events
@@ -267,31 +267,36 @@ The user agent <dfn>ensures an immersive XR device is selected</dfn> by running 
 
 The <dfn attribute for="XR">ondevicechange</dfn> attribute is an [=Event handler IDL attribute=] for the {{devicechange}} event type.
 
-<div class="algorithm" data-algorithm="supports-session">
-The <dfn method for="XR">supportsSession(|mode|)</dfn> method queries if a given |mode| is supported by the user agent and device capabilities.
+<div class="algorithm" data-algorithm="session-supported">
+The <dfn method for="XR">isSessionSupported(|mode|)</dfn> method queries if a given |mode| is supported by the user agent and device capabilities.
 
 When this method is invoked, it MUST run the following steps:
 
   1. Let |promise| be [=a new Promise=].
-  1. If |mode| is {{XRSessionMode/"inline"}}, [=/resolve=] |promise| and return it.
+  1. If |mode| is {{XRSessionMode/"inline"}}, [=/resolve=] |promise| with <code>true</code> and return it.
   1. Run the following steps [=in parallel=]:
+    1. If the requesting document's origin is not allowed to use the "xr-spatial-tracking" [[#feature-policy|feature policy]], [=reject=] |promise| with a "{{SecurityError}}" {{DOMException}} and abort these steps.
     1. [=ensures an immersive XR device is selected|Ensure an immersive XR device is selected=].
-    1. If the [=XR/immersive XR device=] is null, [=reject=] |promise| with a "{{NotSupportedError}}" {{DOMException}} and abort these steps.
-    1. If the [=XR/immersive XR device=]'s [=list of supported modes=] does not [=list/contain=] |mode|, [=reject=] |promise| with a "{{NotSupportedError}}" {{DOMException}} and abort these steps.
-    1. [=/Resolve=] |promise|.
+    1. If the [=XR/immersive XR device=] is null, [=/resolve=] |promise| with <code>false</code> and abort these steps.
+    1. If the [=XR/immersive XR device=]'s [=list of supported modes=] does not [=list/contain=] |mode|, [=/resolve=] |promise| with <code>false</code> and abort these steps.
+    1. [=/Resolve=] |promise| with <code>true</code>.
   1. Return |promise|.
 
 </div>
 
-Calling {{XR/supportsSession()}} MUST NOT trigger device-selection UI as this would cause many sites to display XR-specific dialogs early in the document lifecycle without user activation. Additionally, calling {{XR/supportsSession()}} MUST NOT interfere with any running XR applications on the system, and MUST NOT cause XR-related applications to launch such as system trays or storefronts.
+Calling {{XR/isSessionSupported()}} MUST NOT trigger device-selection UI as this would cause many sites to display XR-specific dialogs early in the document lifecycle without user activation. Additionally, calling {{XR/isSessionSupported()}} MUST NOT interfere with any running XR applications on the system, and MUST NOT cause XR-related applications to launch such as system trays or storefronts.
 
 <div class="example">
 The following code checks to see if {{immersive-vr}} sessions are supported.
 
 <pre highlight="js">
-navigator.xr.supportsSession('immersive-vr').then(() => {
-  // 'immersive-vr' sessions are supported.
-  // Page should advertise support to the user.
+navigator.xr.isSessionSupported('immersive-vr').then((supported) => {
+  if (supported) {
+    // 'immersive-vr' sessions are supported.
+    // Page should advertise support to the user.
+  } else {
+    // 'immersive-vr' sessions are not supported.
+  }
 }
 </pre>
 </div>
@@ -394,7 +399,7 @@ Feature Dependencies {#feature-dependencies}
 
 Some features of an {{XRSession}} may not be universally available for a number of reasons, among which is the fact not all XR devices can support the full set of features. Another consideration is that some features expose [=sensitive information=] which may require a clear signal of [=user intent=] before functioning.
 
-Since it is a poor user experience to to initialize the underlying XR platform and create an {{XRSession}} only to immediately notify the user that the applications cannot function correctly, developers can indicate <dfn>required features</dfn> by passing an {{XRSessionInit}} dictionary to {{XR/requestSession()}}. This will block the creation of the {{XRSession}} if any of the [=required features=] are unavailable due to device limitations or in the absence of a clear signal of [=user intent=] to expose [=sensitive information=] related to the feature.
+Since it is a poor user experience to initialize the underlying XR platform and create an {{XRSession}} only to immediately notify the user that the applications cannot function correctly, developers can indicate <dfn>required features</dfn> by passing an {{XRSessionInit}} dictionary to {{XR/requestSession()}}. This will block the creation of the {{XRSession}} if any of the [=required features=] are unavailable due to device limitations or in the absence of a clear signal of [=user intent=] to expose [=sensitive information=] related to the feature.
 
 Additionally, developers are encouraged to design experiences which progressively enhance their functionality when run one more capable devices. <dfn>Optional features</dfn> which the experience does not require but will take advantage of when available must also be indicated in an {{XRSessionInit}} dictionary to ensure that [=user intent=] can be determined before enabling the feature if necessary.
 
@@ -417,53 +422,61 @@ Future iterations of this specification and additional modules may expand the li
 
 Note: Features are accepted as an array of <code>any</code> values to ensure forwards compatibility. It allows unrecognized optional values to be properly ignored as new [=feature descriptor=] types are added.
 
-Some {{XRSessionMode}}s enable certain [=feature descriptors=] as [=optional features=] by default. This is only done if the feature does not require a signal of [=user intent=] nor impact performance or the behavior of other features when enabled. The following table describes the <dfn>default features</dfn> associated with each session:
+Depending on the {{XRSessionMode}} requested, certain [=feature descriptors=] are added to the {{XRSessionInit/requiredFeatures}} or {{XRSessionInit/optionalFeatures}} lists by default. The following table describes the <dfn>default features</dfn> associated with each session type and feature list:
 
 <table class="tg">
   <thead>
     <tr>
       <th>Feature</th>
       <th>Sessions</th>
+      <th>List</th>
     </tr>
   </thead>
   <tbody>
     <tr>
       <td>{{XRReferenceSpaceType/"viewer"}}</td>
       <td>[=Inline sessions=] and [=immersive sessions=]</td>
+      <td>{{XRSessionInit/requiredFeatures}}</td>
     </tr>
     <tr>
       <td>{{XRReferenceSpaceType/"local"}}</td>
       <td>[=Immersive sessions=]</td>
+      <td>{{XRSessionInit/requiredFeatures}}</td>
     </tr>
   </tbody>
 </table>
 
-The combined list of [=feature descriptors=] given by the {{XRSessionInit/requiredFeatures}}, {{XRSessionInit/optionalFeatures}}, and [=default features=] are collectively considered the <dfn>requested features</dfn> for an {{XRSession}}.
+The combined list of [=feature descriptors=] given by the {{XRSessionInit/requiredFeatures}} and {{XRSessionInit/optionalFeatures}} are collectively considered the <dfn>requested features</dfn> for an {{XRSession}}.
 
-Some [=feature descriptors=], when present in the [=requested features=] list, require that [=user intent=] to use the feature is well understood, via either [=explicit consent=] or [=implicit consent=]. The following table describes which features <dfn>require consent</dfn> prior to being enabled:
+Some [=feature descriptors=], when present in the [=requested features=] list, are subject to [[#feature-policy|feature policy]] and/or requirements that [=user intent=] to use the feature is well understood, via either [=explicit consent=] or [=implicit consent=]. The following table describes the <dfn>feature requirements</dfn> that must be satisfied prior to being enabled:
 
 <table class="tg">
   <thead>
     <tr>
       <th>Feature</th>
-      <th>Criteria</th>
+      <th>Feature Policy Required</th>
+      <th>Consent Required</th>
     </tr>
   </thead>
   <tbody>
     <tr>
       <td>{{XRReferenceSpaceType/"local"}}</td>
+      <td>"xr-spatial-tracking"</td>
       <td>[=Inline sessions=] require consent</td>
     </tr>
     <tr>
       <td>{{XRReferenceSpaceType/"local-floor"}}</td>
+      <td>"xr-spatial-tracking"</td>
       <td>Always requires consent</td>
     </tr>
     <tr>
       <td>{{XRReferenceSpaceType/"bounded-floor"}}</td>
+      <td>"xr-spatial-tracking"</td>
       <td>Always requires consent</td>
     </tr>
     <tr>
       <td>{{XRReferenceSpaceType/"unbounded"}}</td>
+      <td>"xr-spatial-tracking"</td>
       <td>Always requires consent</td>
     </tr>
   </tbody>
@@ -481,19 +494,18 @@ To <dfn>resolve the requested features</dfn> given |requiredFeatures| and |optio
 
   1. Let |consentRequired| be an empty [=/list=] of {{DOMString}}.
   1. Let |consentOptional| be an empty [=/list=] of {{DOMString}}.
+  1. Add every [=feature descriptor=] in the [=default features=] table associated with |session|'s [=XRSession/mode=] to the indicated feature list if it is not already present.
   1. For each |feature| in |requiredFeatures| perform the following steps:
     1. If |feature| is not a valid [=feature descriptor=], return <code>false</code>.
+    1. If the requesting document's origin is not allowed to use any [[#feature-policy|feature policy]] required by |feature| as indicated by the [=feature requirements=] table, return <code>false</code>.
     1. If |session|'s [=XRSession/XR Device=] is not [=capable of supporting=] the functionality described by |feature| or the user agent has otherwise determined to reject the feature, return <code>false</code>.
     1. If the functionality described by |feature| requires [=explicit consent=], append it to |consentRequired|.
     1. Else append |feature| to |session|'s [=list of enabled features=].
   1. For each |feature| in |optionalFeatures| perform the following steps:
     1. If |feature| is not a valid [=feature descriptor=], continue to the next entry.
+    1. If the requesting document's origin is not allowed to use any [[#feature-policy|feature policy]] required by |feature| as indicated by the [=feature requirements=] table, continue to the next entry.
     1. If |session|'s [=XRSession/XR Device=] is not [=capable of supporting=] the functionality described by |feature| or the user agent has otherwise determined to reject the feature, continue to the next entry.
     1. If the functionality described by |feature| requires [=explicit consent=], append it to |consentOptional|.
-    1. Else append |feature| to |session|'s [=list of enabled features=].
-  1. For each |feature| in the [=default features=] table perform the following steps:
-    1. If |session|'s [=XRSession/mode=] is not one of the modes associated with |feature| in the [=default features=], continue to the next entry.
-    1. If |session|'s [=XRSession/XR Device=] is not [=capable of supporting=] the functionality described by |feature| or the user agent has otherwise determined to reject the feature, continue to the next entry.
     1. Else append |feature| to |session|'s [=list of enabled features=].
   1. If |consentRequired| or |consentOptional| are not empty, request [=explicit consent=] to use the functionality described by those features.
   1. For each |feature| in |consentRequired| perform the following steps:
@@ -1008,7 +1020,7 @@ To <dfn>populate the pose</dfn> of an {{XRSpace}} |space| in an {{XRSpace}} |bas
         <dd> Set |transform|'s {{XRRigidTransform/position}} to the position of |space|'s [=effective origin=] in |baseSpace|'s [=coordinate system=].
         <dd> Set |pose|'s {{XRPose/emulatedPosition}} to <code>false</code>.
 
-      <dt> Else if |limit| is <code>false</code> the tracking system provides a [=3DoF=] pose or a [=6DoF=] pose whose position is neither actively tracked nor statically known for |space|'s pose relative to |baseSpace|:
+      <dt> Else if |limit| is <code>false</code> and the tracking system provides a [=3DoF=] pose or a [=6DoF=] pose whose position is neither actively tracked nor statically known for |space|'s pose relative to |baseSpace|:
         <dd> Set |transform|'s {{XRRigidTransform/orientation}} to the orientation of |space|'s [=effective origin=] in |baseSpace|'s [=coordinate system=].
         <dd> Set |transform|'s {{XRRigidTransform/position}} to the tracking system's best estimate of the position of |space|'s [=effective origin=] in |baseSpace|'s [=coordinate system=]. This MAY include a computed offset such as a neck or arm model. If a position estimate is not available, the last known position MUST be used.
         <dd> Set |pose|'s {{XRPose/emulatedPosition}} to <code>true</code>.
@@ -1310,9 +1322,9 @@ An {{XRRigidTransform}} is a transform described by a {{XRRigidTransform/positio
 An {{XRRigidTransform}} contains an <dfn for=XRRigidTransform>internal matrix</dfn> which is a [=/matrix=].
 
 <pre class="idl">
-[SecureContext, Exposed=Window,
- Constructor(optional DOMPointInit position = {}, optional DOMPointInit orientation = {})]
+[SecureContext, Exposed=Window]
 interface XRRigidTransform {
+  constructor(optional DOMPointInit position = {}, optional DOMPointInit orientation = {});
   [SameObject] readonly attribute DOMPointReadOnly position;
   [SameObject] readonly attribute DOMPointReadOnly orientation;
   readonly attribute Float32Array matrix;
@@ -1409,7 +1421,7 @@ The <dfn attribute for="XRPose">emulatedPosition</dfn> attribute is <code>false<
 XRViewerPose {#xrviewerpose-interface}
 ------------
 
-An {{XRViewerPose}} is an {{XRPose}} describing the state of a <dfn>viewer</dfn> of the XR scene as tracked by the [=XRSession/XR device=]. A [=viewer=] may represent a tracked piece of hardware, the observed position of a users head relative to the hardware, or some other means of computing a series of viewpoints into the XR scene. {{XRViewerPose}}s can only be queried relative to an {{XRReferenceSpace}}. It provides, in addition to the {{XRPose}} values, an array of [=view=]s which include include rigid transforms to indicate the viewpoint and projection matrices. These values should be used by the application when render a frame of an XR scene.
+An {{XRViewerPose}} is an {{XRPose}} describing the state of a <dfn>viewer</dfn> of the XR scene as tracked by the [=XRSession/XR device=]. A [=viewer=] may represent a tracked piece of hardware, the observed position of a users head relative to the hardware, or some other means of computing a series of viewpoints into the XR scene. {{XRViewerPose}}s can only be queried relative to an {{XRReferenceSpace}}. It provides, in addition to the {{XRPose}} values, an array of [=view=]s which include rigid transforms to indicate the viewpoint and projection matrices. These values should be used by the application when render a frame of an XR scene.
 
 <pre class="idl">
 [SecureContext, Exposed=Window] interface XRViewerPose : XRPose {
@@ -1460,7 +1472,7 @@ The <dfn attribute for="XRInputSource">targetRayMode</dfn> attribute describes t
   - <dfn enum-value for="XRTargetRayMode">tracked-pointer</dfn> indicates that the target ray originates from either a handheld device or other hand-tracking mechanism and represents that the user is using their hands or the held device for pointing. The orientation of the target ray relative to the tracked object MUST follow platform-specific ergonomics guidelines when available. In the absence of platform-specific guidance, the target ray SHOULD point in the same direction as the user's index finger if it was outstretched.
   - <dfn enum-value for="XRTargetRayMode">screen</dfn> indicates that the input source was an interaction with the canvas element associated with an inline session's output context, such as a mouse click or touch event.
 
-The <dfn attribute for="XRInputSource">targetRaySpace</dfn> attribute is an {{XRSpace}} that has a [=native origin=] tracking the position and orientation of the preferred pointing ray of the {{XRInputSource}}, as defined by the {{targetRayMode}}.s
+The <dfn attribute for="XRInputSource">targetRaySpace</dfn> attribute is an {{XRSpace}} that has a [=native origin=] tracking the position and orientation of the preferred pointing ray of the {{XRInputSource}}, as defined by the {{targetRayMode}}.
 
 The <dfn attribute for="XRInputSource">gripSpace</dfn> attribute is an {{XRSpace}} that has a [=native origin=] tracking to the pose that should be used to render virtual objects such that they appear to be held in the user's hand. If the user were to hold a straight rod, this {{XRSpace}} places the [=native origin=] at the centroid of their curled fingers and where the <code>-Z</code> axis points along the length of the rod towards their thumb. The <code>X</code> axis is perpendicular to the back of the hand being described, with back of the users right hand pointing towards <code>+X</code> and the back of the user's left hand pointing towards <code>-X</code>. The <code>Y</code> axis is implied by the relationship between the <code>X</code> and <code>Z</code> axis, with <code>+Y</code> roughly pointing in the direction of the user's arm.
 
@@ -1604,10 +1616,11 @@ dictionary XRWebGLLayerInit {
   double framebufferScaleFactor = 1.0;
 };
 
-[SecureContext, Exposed=Window, Constructor(XRSession session,
-             XRWebGLRenderingContext context,
-             optional XRWebGLLayerInit layerInit = {})]
+[SecureContext, Exposed=Window]
 interface XRWebGLLayer {
+  constructor(XRSession session,
+             XRWebGLRenderingContext context,
+             optional XRWebGLLayerInit layerInit = {});
   // Attributes
   readonly attribute boolean antialias;
   readonly attribute boolean ignoreDepthValues;
@@ -1874,8 +1887,9 @@ XRSessionEvent {#xrsessionevent-interface}
 {{XRSessionEvent}}s are fired to indicate changes to the state of an {{XRSession}}.
 
 <pre class="idl">
-[SecureContext, Exposed=Window, Constructor(DOMString type, XRSessionEventInit eventInitDict)]
+[SecureContext, Exposed=Window]
 interface XRSessionEvent : Event {
+  constructor(DOMString type, XRSessionEventInit eventInitDict);
   [SameObject] readonly attribute XRSession session;
 };
 
@@ -1892,8 +1906,9 @@ XRInputSourceEvent {#xrinputsourceevent-interface}
 {{XRInputSourceEvent}}s are fired to indicate changes to the state of an {{XRInputSource}}.
 
 <pre class="idl">
-[SecureContext, Exposed=Window, Constructor(DOMString type, XRInputSourceEventInit eventInitDict)]
+[SecureContext, Exposed=Window]
 interface XRInputSourceEvent : Event {
+  constructor(DOMString type, XRInputSourceEventInit eventInitDict);
   [SameObject] readonly attribute XRFrame frame;
   [SameObject] readonly attribute XRInputSource inputSource;
 };
@@ -1926,8 +1941,9 @@ XRInputSourcesChangeEvent {#xrinputsourceschangeevent-interface}
 {{XRInputSourcesChangeEvent}}s are fired to indicate changes to the {{XRInputSource}}s that are available to an {{XRSession}}.
 
 <pre class="idl">
-[SecureContext, Exposed=Window, Constructor(DOMString type, XRInputSourcesChangeEventInit eventInitDict)]
+[SecureContext, Exposed=Window]
 interface XRInputSourcesChangeEvent : Event {
+  constructor(DOMString type, XRInputSourcesChangeEventInit eventInitDict);
   [SameObject] readonly attribute XRSession session;
   [SameObject] readonly attribute FrozenArray&lt;XRInputSource&gt; added;
   [SameObject] readonly attribute FrozenArray&lt;XRInputSource&gt; removed;
@@ -1954,8 +1970,9 @@ XRReferenceSpaceEvent {#xrreferencespaceevent-interface}
 {{XRReferenceSpaceEvent}}s are fired to indicate changes to the state of an {{XRReferenceSpace}}.
 
 <pre class="idl">
-[SecureContext, Exposed=Window, Constructor(DOMString type, XRReferenceSpaceEventInit eventInitDict)]
+[SecureContext, Exposed=Window]
 interface XRReferenceSpaceEvent : Event {
+  constructor(DOMString type, XRReferenceSpaceEventInit eventInitDict);
   [SameObject] readonly attribute XRReferenceSpace referenceSpace;
   [SameObject] readonly attribute XRRigidTransform? transform;
 };
@@ -1975,7 +1992,7 @@ Event Types {#event-types}
 
 The user agent MUST provide the following new events. Registration for and firing of the events must follow the usual behavior of DOM4 Events.
 
-The user agent MUST fire a <dfn event for="XR">devicechange</dfn> event on the {{XR}} object to indicate that the availability of [=XR/immersive XR device=]s has been changed. The event MUST be of type {{Event}}.
+The user agent MUST fire a <dfn event for="XR">devicechange</dfn> event on the {{XR}} object to indicate that the availability of [=XR/immersive XR device=]s has been changed unless the document's origin is not allowed to use the "xr-spatial-tracking" [[#feature-policy|feature policy]]. The event MUST be of type {{Event}}.
 
 A user agent MUST dispatch a <dfn event for="XRSession">visibilitychange</dfn> event on an {{XRSession}} each time the [=XRSession/visibility state=] of the {{XRSession}} has changed. The event MUST be of type {{XRSessionEvent}}.
 
@@ -2025,7 +2042,6 @@ To determine if a given {{Document}} |document| is <dfn>trustworthy</dfn> the us
 
   1. If |document| is not a [=responsible=] document, return <code>false</code>
   1. If |document| is not [=active and focused=], return <code>false</code>
-  1. If |document|'s origin is not allowed to use the WebXR [[#feature-policy|feature policy]], return <code>false</code>
   1. Return <code>true</code>
 
 </div>
@@ -2099,7 +2115,6 @@ To determine if an <dfn>inline session request is allowed</dfn> the user agent M
 
   1. If the session request contained any [=required features=] or [=optional features=] and the request was not [=triggered by user activation=] or [=launching a web application=], return <code>false</code>
   1. If the requesting document is not [=responsible=], return <code>false</code>
-  1. If requesting document's origin is not allowed to use the WebXR [[#feature-policy|feature policy]] return <code>false</code>
   1. Return <code>true</code>
 
 </div>
@@ -2150,7 +2165,7 @@ Depending on the reference spaces used, several different types of [=sensitive i
 
 As a result the various reference space types have restrictions placed on their creation to ensure the [=sensitive information=] expose is handled safely:
 
-Most reference spaces require that [=user intent=] to use the reference space is well understood, either via [=explicit consent=] or [=implicit consent=]. See the [=require consent|features which require consent=] table for details.
+Most reference spaces require that [=user intent=] to use the reference space is well understood, either via [=explicit consent=] or [=implicit consent=]. See the [=feature requirements=] table for details.
  
 Any group of {{XRReferenceSpaceType/"local"}}, {{XRReferenceSpaceType/"local-floor"}}, and {{XRReferenceSpaceType/"bounded-floor"}} reference spaces that are capable of being related to one another MUST share a common [=native origin=]; This restriction only applies when the creation of {{XRReferenceSpaceType/"unbounded"}} reference spaces has been restricted.
 
@@ -2206,11 +2221,13 @@ Integrations {#integrations}
 Feature Policy {#feature-policy}
 --------------
 
-This specification defines a [=policy-controlled feature=] that controls whether the {{Navigator/xr}} attribute is exposed on the {{Navigator}} object.
+This specification defines a [=policy-controlled feature=] that controls whether any {{XRSession}} that requires the use of spatial tracking may be returned by {{XR/requestSession()}}, and whether support for session modes that require spatial tracking may be indicated by either {{XR/isSessionSupported()}} or {{devicechange}} events on the {{Navigator/xr|navigator.xr}} object.
 
-The feature identifier for this feature is <code>"xr"</code>.
+The feature identifier for this feature is <code>"xr-spatial-tracking"</code>.
 
 The [=default allowlist=] for this feature is <code>["self"]</code>.
+
+Note: If the document's origin is not allowed to use the <code>"xr-spatial-tracking"</code> feature policy any [=immersive sessions=] will be blocked, because all [=immersive sessions=] require some use of spatial tracking. [=Inline sessions=] will still be allowed, but restricted to only using the {{XRReferenceSpaceType/"viewer"}} {{XRReferenceSpace}}.
 
 Acknowledgements {#ack}
 ================
